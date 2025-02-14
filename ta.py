@@ -39,11 +39,13 @@ def main():
     base_path = os.path.expanduser("~/.ta")
     vector_store_path = os.path.join(base_path, "vector_store")
     os.makedirs(vector_store_path, exist_ok=True)
-    threads_path = os.path.join(base_path, "threads.json")
     history_db_path = os.path.join(base_path, "history.db")
+    threads_path = os.path.join(base_path, "threads.json")
+    # for thread similarity matching (experimental)
+    chroma_db_path = os.path.join(base_path, "chroma_db")
 
     kb = KnowledgeBase(rag_docs_path, vector_store_path)
-    chat = ChatOpenAI(save_file=threads_path)
+    chat = ChatOpenAI(save_file=threads_path, chroma_db_path=chroma_db_path)
     history = ConversationHistory(db_path=history_db_path)
 
     thread_id = chat.generate_thread_id()

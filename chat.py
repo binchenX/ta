@@ -14,14 +14,19 @@ chroma_settings = Settings(anonymized_telemetry=False, allow_reset=True)
 
 
 class ChatOpenAI:
-    def __init__(self, history_limit=5, save_file="conversations.json"):
+    def __init__(
+        self,
+        history_limit=5,
+        save_file="conversations.json",
+        chroma_db_path="./chroma_db",
+    ):
         self.threads: Dict[str, Dict] = {}
         self.history_limit = history_limit
         self.save_file = save_file
 
         # Initialize ChromaDB
         self.chroma_client = chromadb.PersistentClient(
-            path="./chroma_db", settings=chroma_settings
+            path=chroma_db_path, settings=chroma_settings
         )
 
         # Use OpenAI embeddings
