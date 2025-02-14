@@ -33,8 +33,7 @@ def main():
     args = parser.parse_args()
 
     history = ConversationHistory()
-    #kb = KnowledgeBase(args.docs, args.vector_store)
-    #dq = DirectQueryLangchain()
+    kb = KnowledgeBase(args.docs, args.vector_store)
     chat = ChatOpenAI()
     
     thread_id = chat.generate_thread_id()
@@ -43,8 +42,12 @@ def main():
      # Register signal handler for graceful exit
     signal.signal(signal.SIGINT, signal_handler)
 
+    # default to chat mode, use /rag /chat to switch modes
+    mode = "chat"
+    prompt = "❓>: "
+
     while True:
-        query = input("❓>: ").strip()
+        query = input(prompt).strip()
         if query.lower() == 'exit':
             print("Exiting interactive query mode. Goodbye!")
             break
@@ -86,20 +89,28 @@ def main():
             print(f"New thread created with ID: {thread_id}")
             continue
 
+        # switch to rag mode if query starts with /rag
+        if query.lower().startswith("/rag"):
+            print("Switching to RAG mode...")
+            mode = "rag"
+            continue
+
+        if query.lower().startswith("/chat"):
+            print("Switching to chat mode...")
+            mode = "chat"
+            continue
+
         if not query:
             print("Please enter a valid question.")
             continue
 
-        # Determine which query function to use
-        # if query.startswith('/rag'):
-        #     query = query[len('/rag'):].strip()
-        #     query_function = kb.query
-        # else:
-        #     query_function = chat.query
-
         # Query knowledge base or direct query
         try:
-            response = chat.query(query)
+            if mode == "rag":
+                response = kb.query(query)
+            elif mode == "chat":
+                response = chat.query(query)
+
             print(f"🤖:\n")
             
             markdown_response = Markdown(response)
