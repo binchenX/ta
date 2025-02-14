@@ -44,10 +44,28 @@ def main():
 
     # default to chat mode, use /rag /chat to switch modes
     mode = "chat"
-    prompt = "❓>: "
 
     while True:
+        if mode == "rag":
+            prompt = "[rag] ❓>: "
+        else:
+            prompt = "❓>: "
+
         query = input(prompt).strip()
+
+        # if query is /help, show help
+        if query.lower() == "/help":
+            print("Commands:")
+            print("/lt: List threads")
+            print("/st [thread_id]: Set current thread")
+            print("/dt [thread_id]: Delete thread")
+            print("/nt: New thread")
+            print("/rag: Switch to RAG mode")
+            print("/chat: Switch to chat mode")
+            print("/rag reindex: Reindex knowledge base")
+            print("/exit: Exit interactive query mode")
+            continue
+        
         if query.lower() == 'exit':
             print("Exiting interactive query mode. Goodbye!")
             break
