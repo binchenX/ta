@@ -5,3 +5,6 @@ streamlit
 langchain-community
 langchain-chroma
 langchain-openai
+unstructured 
+markdown
+unstructured[all-docs]
