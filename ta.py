@@ -4,8 +4,9 @@ import time
 
 from logger_config import configure_logging  # Import the logging configuration
 from rag import KnowledgeBase
-from web import DirectQuery  # Import the DirectQuery class
+from web import DirectQueryLangchain  # Import the DirectQuery class
 from history import ConversationHistory
+from chat import ChatOpenAI
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,8 +21,12 @@ def main():
     args = parser.parse_args()
 
     history = ConversationHistory()
-    kb = KnowledgeBase(args.docs, args.vector_store)
-    dq = DirectQuery()
+    #kb = KnowledgeBase(args.docs, args.vector_store)
+    #dq = DirectQueryLangchain()
+    chat = ChatOpenAI()
+    
+    thread_id = chat.generate_thread_id()
+    chat.set_current_thread_id(thread_id)
 
     while True:
         query = input("❓>: ").strip()
@@ -34,15 +39,15 @@ def main():
             continue
 
         # Determine which query function to use
-        if query.startswith('/rag'):
-            query = query[len('/rag'):].strip()
-            query_function = kb.query
-        else:
-            query_function = dq.query
+        # if query.startswith('/rag'):
+        #     query = query[len('/rag'):].strip()
+        #     query_function = kb.query
+        # else:
+        #     query_function = chat.query
 
         # Query knowledge base or direct query
         try:
-            response = query_function(query)
+            response = chat.query(query)
             print(f"🤖: {response}\n")
             
             # Save conversation

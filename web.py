@@ -10,7 +10,7 @@ logger = configure_logging()
 
 import os
 
-class DirectQuery:
+class DirectQueryLangchain:
     def __init__(self):
         self.llm = ChatOpenAI(
             temperature=0,
