@@ -48,6 +48,21 @@ class ChatOpenAI:
         with open(self.save_file, "w") as f:
             json.dump(self.threads, f, indent=4)
 
+    # delete thread by id
+    def delete_thread(self, thread_id: str):
+        """Delete a thread by ID."""
+        if thread_id in self.threads:
+            del self.threads[thread_id]
+            self.save_conversations()
+            return True
+        
+        # update the vector db
+        try:
+            self.collection.delete(ids=[thread_id])
+        except Exception as e:
+            logger.error(f"Error deleting thread from vector database: {e}")
+        return False
+
     def list_threads_with_topics(self) -> List[str]:
         """List all thread IDs with their topics in the format [thread_id] topic."""
         return [f"[{thread_id}] {self.threads[thread_id].get('topic', 'No topic')}" for thread_id in self.threads]

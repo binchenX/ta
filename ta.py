@@ -43,6 +43,7 @@ def main():
             print("Exiting interactive query mode. Goodbye!")
             break
 
+        # list threads
         if query.lower() == "/lt":
             threads = chat.list_threads_with_topics()
             print("Threads:")
@@ -50,6 +51,7 @@ def main():
                 print(f"- {thread}")
             continue
 
+        # set curent thread
         if query.lower().startswith("/st"):
             try:
                 thread_id = query.split()[1]
@@ -59,6 +61,17 @@ def main():
                 print("Invalid thread ID. Please enter a valid number after 'st'.")
             continue
 
+        # delete thread by id
+        if query.lower().startswith("/dt"):
+            try:
+                thread_id = query.split()[1]
+                if chat.delete_thread(thread_id):
+                    print(f"Deleted thread {thread_id}")
+                else:
+                    print(f"Thread {thread_id} not found")
+            except (IndexError, ValueError):
+                print("Invalid thread ID. Please enter a valid number after 'dt'.")
+            continue
 
         if not query:
             print("Please enter a valid question.")
