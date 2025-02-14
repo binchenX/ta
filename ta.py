@@ -43,6 +43,23 @@ def main():
             print("Exiting interactive query mode. Goodbye!")
             break
 
+        if query.lower() == "/lt":
+            threads = chat.list_threads_with_topics()
+            print("Threads:")
+            for thread in threads:
+                print(f"- {thread}")
+            continue
+
+        if query.lower().startswith("/st"):
+            try:
+                thread_id = query.split()[1]
+                chat.set_current_thread_id(thread_id)
+                print(f"Current thread set to {thread_id}")
+            except (IndexError, ValueError):
+                print("Invalid thread ID. Please enter a valid number after 'st'.")
+            continue
+
+
         if not query:
             print("Please enter a valid question.")
             continue

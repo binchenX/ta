@@ -48,6 +48,10 @@ class ChatOpenAI:
         with open(self.save_file, "w") as f:
             json.dump(self.threads, f, indent=4)
 
+    def list_threads_with_topics(self) -> List[str]:
+        """List all thread IDs with their topics in the format [thread_id] topic."""
+        return [f"[{thread_id}] {self.threads[thread_id].get('topic', 'No topic')}" for thread_id in self.threads]
+
     # set current thread id
     def set_current_thread_id(self, thread_id: str):
         self.current_thread_id = thread_id
