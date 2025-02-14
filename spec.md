@@ -13,10 +13,3 @@ I want to write a command line software that:
 - As mentioned above, make sure the chosen framework allows me to create an agent. This is very important.
 - I prefer command line but a web UI may make sense. I also want to try some popular AI-focused UIs such as Streamlit (may be misspelled).
 
-Based on the requirements and design and implementation preferences, please first suggest the design and framework to be used. Show me the design document and reasoning.
-
-## Decision
-
-- use langchain and chromaDb
-- create good directory structure
-- show me the command to install all dependency ( e.g install chromaDB)
