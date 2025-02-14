@@ -1,13 +1,11 @@
 from dotenv import load_dotenv
 import argparse
-import time
 import signal
 import sys
 import os
 
-from logger_config import configure_logging  # Import the logging configuration
+from logger_config import configure_logging
 from rag import KnowledgeBase
-from web import DirectQueryLangchain  # Import the DirectQuery class
 from history import ConversationHistory
 from chat import ChatOpenAI
 

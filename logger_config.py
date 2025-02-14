@@ -1,10 +1,10 @@
-# logging_config.py
 import logging
+
 
 def configure_logging():
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - [ %(name)s - %(module)s ] - %(message)s'
+        format="%(asctime)s - %(levelname)s - [ %(name)s - %(module)s ] - %(message)s",
     )
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
