@@ -10,6 +10,12 @@ from web import DirectQueryLangchain  # Import the DirectQuery class
 from history import ConversationHistory
 from chat import ChatOpenAI
 
+from rich.console import Console
+from rich.markdown import Markdown
+
+# Initialize the rich console
+console = Console()
+
 # Load environment variables from .env file
 load_dotenv()
 logger = configure_logging()
@@ -94,8 +100,10 @@ def main():
         # Query knowledge base or direct query
         try:
             response = chat.query(query)
-            print(f"🤖: {response}\n")
+            print(f"🤖:\n")
             
+            markdown_response = Markdown(response)
+            console.print(markdown_response)
             # Save conversation
             history.save(query, response)
         
