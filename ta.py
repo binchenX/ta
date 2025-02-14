@@ -3,6 +3,7 @@ import argparse
 import time
 import signal
 import sys
+import os
 
 from logger_config import configure_logging  # Import the logging configuration
 from rag import KnowledgeBase
@@ -26,14 +27,14 @@ def signal_handler(sig, frame):
     
 def main():
     parser = argparse.ArgumentParser(description="Query the local knowledge base.")
-    parser.add_argument('--docs', type=str, default='./docs', help='Path to documentation files')
     parser.add_argument('--vector-store', type=str, default='./vector_store', help='Path to vector store')
     parser.add_argument('--history', action='store_true', help='Show conversation history')
     
     args = parser.parse_args()
 
     history = ConversationHistory()
-    kb = KnowledgeBase(args.docs, args.vector_store)
+    rag_docs_path = os.getenv('RAG_DOC_PATH', "./doc")
+    kb = KnowledgeBase(rag_docs_path, args.vector_store)
     chat = ChatOpenAI()
     
     thread_id = chat.generate_thread_id()

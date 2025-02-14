@@ -84,7 +84,7 @@ class KnowledgeBase:
         # Check if there are any markdown files
         markdown_files = [f for f in os.listdir(self.docs_path) if f.endswith('.md')]
         if not markdown_files:
-            raise FileNotFoundError(f"No markdown files found in {self.docs_path}")
+            raise FileNotFoundError(f"No markdown files found in {self.docs_path}. Nothing to index.")
         
         logging.info(f"Found markdown files: {markdown_files}")
         
