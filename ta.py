@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 import argparse
 import time
+import signal
+import sys
 
 from logger_config import configure_logging  # Import the logging configuration
 from rag import KnowledgeBase
@@ -12,6 +14,10 @@ from chat import ChatOpenAI
 load_dotenv()
 logger = configure_logging()
 
+def signal_handler(sig, frame):
+    print("\nExiting interactive query mode. Goodbye!")
+    sys.exit(0)
+    
 def main():
     parser = argparse.ArgumentParser(description="Query the local knowledge base.")
     parser.add_argument('--docs', type=str, default='./docs', help='Path to documentation files')
@@ -27,6 +33,9 @@ def main():
     
     thread_id = chat.generate_thread_id()
     chat.set_current_thread_id(thread_id)
+
+     # Register signal handler for graceful exit
+    signal.signal(signal.SIGINT, signal_handler)
 
     while True:
         query = input("❓>: ").strip()

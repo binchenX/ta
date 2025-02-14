@@ -5,10 +5,15 @@ from logger_config import configure_logging
 from typing import Dict, List
 import chromadb
 from chromadb.utils import embedding_functions
+from chromadb.config import Settings
 
 logger = configure_logging()
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
+# Disable ChromaDB telemetry
+chroma_settings = Settings(
+    anonymized_telemetry=False,
+    allow_reset=True
+)
 class ChatOpenAI:
     def __init__(self, history_limit=5, save_file="conversations.json"):
         self.threads: Dict[str, Dict] = {}
@@ -16,7 +21,7 @@ class ChatOpenAI:
         self.save_file = save_file
         
         # Initialize ChromaDB
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+        self.chroma_client = chromadb.PersistentClient(path="./chroma_db", settings=chroma_settings)
         
         # Use OpenAI embeddings
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
@@ -89,7 +94,7 @@ class ChatOpenAI:
             )
 
             # log thread_id and summary
-            logger.info(f"Update vector db: Thread ID: {thread_id}, Summary: {summary}")
+            logger.info(f"Update vector db: Thread ID: {thread_id}, Topic: {summary}")
             
             if results and results['ids']:
                 # Update existing entry
@@ -148,14 +153,19 @@ class ChatOpenAI:
         
         # Keep only last few messages
         self.threads[thread_id]["messages"] = self.threads[thread_id]["messages"][-self.history_limit:]
-        
-        # Update topic, summary, and vector DB periodically
-        # if len(self.threads[thread_id]["messages"]) % 3 == 0:
+        self.save_conversations()
+
+    def add_turn(self, thread_id: str, usr_message: str, asssitant_message: str):
+        self.add_message(thread_id, "user", usr_message)
+        self.add_message(thread_id, "assistant", asssitant_message)
+
+        # update topic and summary with lastest exchange, and update the vector db with thread topic
         topic, summary = self.generate_topic_and_summary(self.threads[thread_id]["messages"])
         self.threads[thread_id]["topic"] = topic
         self.threads[thread_id]["summary"] = summary
         self.update_vector_db(thread_id, topic)
-        
+
+        # save topic and sumary
         self.save_conversations()
 
     def query(self, user_message: str) -> str:
@@ -175,9 +185,8 @@ class ChatOpenAI:
         )
         
         assistant_reply = response.choices[0].message.content
-        
-        self.add_message(thread_id, "user", user_message)
-        self.add_message(thread_id, "assistant", assistant_reply)
+
+        self.add_turn(thread_id, user_message, assistant_reply)
         
         logger.info(f"Thread ID: {thread_id}, Topic: {self.threads[thread_id].get('topic', 'No topic yet')}")
         
