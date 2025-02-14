@@ -80,18 +80,24 @@ class KnowledgeBase:
                 client_settings=chroma_settings
             )
         
-        # reindex is True or vector store does not exist or is empty
-        # Check if there are any markdown files
-        markdown_files = [f for f in os.listdir(self.docs_path) if f.endswith('.md')]
-        if not markdown_files:
-            raise FileNotFoundError(f"No markdown files found in {self.docs_path}. Nothing to index.")
-        
-        logging.info(f"Found markdown files: {markdown_files}")
-        
+        # Reindex is True or vector store does not exist or is empty
+
+        # Clear existing collection before indexing
+        if Chroma(
+            persist_directory=self.vector_store_path,
+            embedding_function=self.embeddings,
+            client_settings=chroma_settings
+        ).get().get('ids'):
+            Chroma(
+                persist_directory=self.vector_store_path,
+                embedding_function=self.embeddings,
+                client_settings=chroma_settings
+            ).delete_collection()
+
         # Load and process documents
         loader = DirectoryLoader(self.docs_path, glob="**/*.md")
         documents = loader.load()
-        logging.debug(f"Loaded documents: {documents}")
+        logging.info(f"Loaded {len(documents)} documents")
         
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
