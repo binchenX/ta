@@ -2,7 +2,7 @@ import sqlite3
 
 
 class ConversationHistory:
-    def __init__(self, db_path: str = "conversation_history.db"):
+    def __init__(self, db_path: str):
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
         self._create_table()

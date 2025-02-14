@@ -16,9 +16,9 @@ chroma_settings = Settings(anonymized_telemetry=False, allow_reset=True)
 class ChatOpenAI:
     def __init__(
         self,
+        save_file,
+        chroma_db_path,
         history_limit=5,
-        save_file="conversations.json",
-        chroma_db_path="./chroma_db",
     ):
         self.threads: Dict[str, Dict] = {}
         self.history_limit = history_limit

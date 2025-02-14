@@ -31,10 +31,6 @@ def main():
     parser = argparse.ArgumentParser(description="iTelligent Assistant (ta)")
     args = parser.parse_args()
 
-    # todo: load it from ~/.ta/config file
-    # todo: rag should support multiple doc paths
-    rag_docs_path = os.getenv("RAG_DOC_PATH", "./doc")
-
     # configrations
     base_path = os.path.expanduser("~/.ta")
     vector_store_path = os.path.join(base_path, "vector_store")
@@ -44,7 +40,14 @@ def main():
     # for thread similarity matching (experimental)
     chroma_db_path = os.path.join(base_path, "chroma_db")
 
-    kb = KnowledgeBase(rag_docs_path, vector_store_path)
+    rag_enabled = False
+    rag_docs_path = os.getenv("RAG_DOC_PATH")
+
+    # if RAG_DOC_PATH is not set, don't enable RAG mode
+    if rag_docs_path:
+        rag_enabled = True
+        kb = KnowledgeBase(docs_path=rag_docs_path, vector_store_path=vector_store_path)
+
     chat = ChatOpenAI(save_file=threads_path, chroma_db_path=chroma_db_path)
     history = ConversationHistory(db_path=history_db_path)
 
@@ -121,8 +124,12 @@ def main():
 
         # switch to rag mode if query starts with /rag
         if query.lower().strip() == "/rag":
-            print("Switching to RAG mode...")
-            mode = "rag"
+            if not rag_enabled:
+                print("RAG mode is not enabled. Please set RAG_DOC_PATH in .env file.")
+                continue
+            else:
+                print("Switching to RAG mode...")
+                mode = "rag"
             continue
 
         # if query is /rag reindex, reindex the knowledge base
