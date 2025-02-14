@@ -10,31 +10,31 @@ from chromadb.config import Settings
 logger = configure_logging()
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Disable ChromaDB telemetry
-chroma_settings = Settings(
-    anonymized_telemetry=False,
-    allow_reset=True
-)
+chroma_settings = Settings(anonymized_telemetry=False, allow_reset=True)
+
+
 class ChatOpenAI:
     def __init__(self, history_limit=5, save_file="conversations.json"):
         self.threads: Dict[str, Dict] = {}
         self.history_limit = history_limit
         self.save_file = save_file
-        
+
         # Initialize ChromaDB
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db", settings=chroma_settings)
-        
+        self.chroma_client = chromadb.PersistentClient(
+            path="./chroma_db", settings=chroma_settings
+        )
+
         # Use OpenAI embeddings
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
             api_key=os.getenv("OPENAI_API_KEY"),
             model_name=os.getenv("EMBEDDING_NAME", "text-embedding-3-large_v1"),
         )
-        
+
         # Create or get the collection
         self.collection = self.chroma_client.get_or_create_collection(
-            name="thread_summaries",
-            embedding_function=self.embedding_function
+            name="thread_summaries", embedding_function=self.embedding_function
         )
-        
+
         self.load_conversations()
 
     def load_conversations(self):
@@ -55,7 +55,7 @@ class ChatOpenAI:
             del self.threads[thread_id]
             self.save_conversations()
             return True
-        
+
         # update the vector db
         try:
             self.collection.delete(ids=[thread_id])
@@ -65,14 +65,19 @@ class ChatOpenAI:
 
     def list_threads_with_topics(self) -> List[str]:
         """List all thread IDs with their topics in the format [thread_id] topic."""
-        return [f"[{thread_id}] {self.threads[thread_id].get('topic', 'No topic')}" for thread_id in self.threads]
+        return [
+            f"[{thread_id}] {self.threads[thread_id].get('topic', 'No topic')}"
+            for thread_id in self.threads
+        ]
 
     # set current thread id
     def set_current_thread_id(self, thread_id: str):
         self.current_thread_id = thread_id
-    
+
     def generate_thread_id(self) -> str:
         """Generate a unique thread ID."""
+        if not self.threads:
+            return "1"
         if self.threads:
             last_thread_id = max(int(tid) for tid in self.threads.keys())
             return str(last_thread_id + 1)
@@ -80,7 +85,7 @@ class ChatOpenAI:
     def generate_topic_and_summary(self, messages: List[Dict]) -> tuple:
         """Generate a topic and summary for a thread using GPT."""
         context = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
-        
+
         prompt = f"""Based on the following conversation, provide:
         1. A topic (less than 10 words)
         2. A summary (up to 100 words)
@@ -94,41 +99,32 @@ class ChatOpenAI:
 
         response = client.chat.completions.create(
             model=os.getenv("MODEL_NAME", "gpt-4-mini_v2024-07-18"),
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
         )
 
         result = response.choices[0].message.content
         topic = result.split("TOPIC:")[1].split("SUMMARY:")[0].strip()
         summary = result.split("SUMMARY:")[1].strip()
-        
+
         logger.info(f"Generated topic: {topic}")
-        
+
         return topic, summary
 
     def update_vector_db(self, thread_id: str, summary: str):
         """Update the vector database with the thread summary."""
         try:
             # Check if thread_id exists in the collection
-            results = self.collection.get(
-                ids=[thread_id],
-                include=['documents']
-            )
+            results = self.collection.get(ids=[thread_id], include=["documents"])
 
             # log thread_id and summary
             logger.info(f"Update vector db: Thread ID: {thread_id}, Topic: {summary}")
-            
-            if results and results['ids']:
+
+            if results and results["ids"]:
                 # Update existing entry
-                self.collection.update(
-                    ids=[thread_id],
-                    documents=[summary]
-                )
+                self.collection.update(ids=[thread_id], documents=[summary])
             else:
                 # Add new entry
-                self.collection.add(
-                    ids=[thread_id],
-                    documents=[summary]
-                )
+                self.collection.add(ids=[thread_id], documents=[summary])
         except Exception as e:
             logger.error(f"Error updating vector database: {e}")
 
@@ -141,19 +137,21 @@ class ChatOpenAI:
             results = self.collection.query(
                 query_texts=[user_message],
                 n_results=1,
-                include=['distances', 'documents']
+                include=["distances", "documents"],
             )
-            
-            if results and results['distances'] and results['distances'][0]:
-                similarity_score = 1 - results['distances'][0][0]  # Convert distance to similarity
+
+            if results and results["distances"] and results["distances"][0]:
+                similarity_score = (
+                    1 - results["distances"][0][0]
+                )  # Convert distance to similarity
                 logger.info(f"Similarity score: {similarity_score}")
                 if similarity_score > 0.7:  # Threshold
-                    return results['ids'][0][0]
-            
+                    return results["ids"][0][0]
+
             logger.info("No similar thread found")
             # Create new thread if no similar thread found
             return str(len(self.threads) + 1)
-            
+
         except Exception as e:
             logger.error(f"Error in vector similarity search: {e}")
             return str(len(self.threads) + 1)
@@ -161,19 +159,14 @@ class ChatOpenAI:
     def add_message(self, thread_id: str, role: str, message: str):
         """Add a message to the conversation thread and update metadata."""
         if thread_id not in self.threads:
-            self.threads[thread_id] = {
-                "messages": [],
-                "topic": "",
-                "summary": ""
-            }
-        
-        self.threads[thread_id]["messages"].append({
-            "role": role,
-            "content": message
-        })
-        
+            self.threads[thread_id] = {"messages": [], "topic": "", "summary": ""}
+
+        self.threads[thread_id]["messages"].append({"role": role, "content": message})
+
         # Keep only last few messages
-        self.threads[thread_id]["messages"] = self.threads[thread_id]["messages"][-self.history_limit:]
+        self.threads[thread_id]["messages"] = self.threads[thread_id]["messages"][
+            -self.history_limit :
+        ]
         self.save_conversations()
 
     def add_turn(self, thread_id: str, usr_message: str, asssitant_message: str):
@@ -181,7 +174,9 @@ class ChatOpenAI:
         self.add_message(thread_id, "assistant", asssitant_message)
 
         # update topic and summary with lastest exchange, and update the vector db with thread topic
-        topic, summary = self.generate_topic_and_summary(self.threads[thread_id]["messages"])
+        topic, summary = self.generate_topic_and_summary(
+            self.threads[thread_id]["messages"]
+        )
         self.threads[thread_id]["topic"] = topic
         self.threads[thread_id]["summary"] = summary
         self.update_vector_db(thread_id, topic)
@@ -192,25 +187,24 @@ class ChatOpenAI:
     def query(self, user_message: str) -> str:
         """Process user message and get AI response while managing conversation history."""
         thread_id = self.current_thread_id
-        
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."}
-        ]
-        
+
+        messages = [{"role": "system", "content": "You are a helpful assistant."}]
+
         messages += self.get_recent_messages(thread_id)
         messages.append({"role": "user", "content": user_message})
-        
+
         response = client.chat.completions.create(
-            model=os.getenv("MODEL_NAME"),
-            messages=messages
+            model=os.getenv("MODEL_NAME"), messages=messages
         )
-        
+
         assistant_reply = response.choices[0].message.content
 
         self.add_turn(thread_id, user_message, assistant_reply)
-        
-        logger.info(f"Thread ID: {thread_id}, Topic: {self.threads[thread_id].get('topic', 'No topic yet')}")
-        
+
+        logger.info(
+            f"Thread ID: {thread_id}, Topic: {self.threads[thread_id].get('topic', 'No topic yet')}"
+        )
+
         return assistant_reply
 
     def get_recent_messages(self, thread_id: str) -> List[Dict]:
@@ -223,6 +217,6 @@ class ChatOpenAI:
             return {
                 "topic": self.threads[thread_id].get("topic", ""),
                 "summary": self.threads[thread_id].get("summary", ""),
-                "message_count": len(self.threads[thread_id]["messages"])
+                "message_count": len(self.threads[thread_id]["messages"]),
             }
         return None

@@ -21,26 +21,35 @@ console = Console(width=100)
 load_dotenv()
 logger = configure_logging()
 
+
 def signal_handler(sig, frame):
     print("\nExiting interactive query mode. Goodbye!")
     sys.exit(0)
-    
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Query the local knowledge base.")
-    parser.add_argument('--vector-store', type=str, default='./vector_store', help='Path to vector store')
-    parser.add_argument('--history', action='store_true', help='Show conversation history')
-    
+    parser = argparse.ArgumentParser(description="iTelligent Assistant (ta)")
     args = parser.parse_args()
 
-    history = ConversationHistory()
-    rag_docs_path = os.getenv('RAG_DOC_PATH', "./doc")
-    kb = KnowledgeBase(rag_docs_path, args.vector_store)
-    chat = ChatOpenAI()
-    
+    # todo: load it from ~/.ta/config file
+    # todo: rag should support multiple doc paths
+    rag_docs_path = os.getenv("RAG_DOC_PATH", "./doc")
+
+    # configrations
+    base_path = os.path.expanduser("~/.ta")
+    vector_store_path = os.path.join(base_path, "vector_store")
+    os.makedirs(vector_store_path, exist_ok=True)
+    threads_path = os.path.join(base_path, "threads.json")
+    history_db_path = os.path.join(base_path, "history.db")
+
+    kb = KnowledgeBase(rag_docs_path, vector_store_path)
+    chat = ChatOpenAI(save_file=threads_path)
+    history = ConversationHistory(db_path=history_db_path)
+
     thread_id = chat.generate_thread_id()
     chat.set_current_thread_id(thread_id)
 
-     # Register signal handler for graceful exit
+    # Register signal handler for graceful exit
     signal.signal(signal.SIGINT, signal_handler)
 
     # default to chat mode, use /rag /chat to switch modes
@@ -66,8 +75,8 @@ def main():
             print("/rag reindex: Reindex knowledge base")
             print("/exit: Exit interactive query mode")
             continue
-        
-        if query.lower() == 'exit':
+
+        if query.lower() == "exit":
             print("Exiting interactive query mode. Goodbye!")
             break
 
@@ -136,14 +145,15 @@ def main():
                 response = chat.query(query)
 
             print(f"🤖:\n")
-            
+
             markdown_response = Markdown(response)
             console.print(markdown_response)
             # Save conversation
             history.save(query, response)
-        
+
         except Exception as e:
             print(f"Error: {str(e)}")
+
 
 if __name__ == "__main__":
     main()
