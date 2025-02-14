@@ -90,12 +90,17 @@ def main():
             continue
 
         # switch to rag mode if query starts with /rag
-        if query.lower().startswith("/rag"):
+        if query.lower().strip() == "/rag":
             print("Switching to RAG mode...")
             mode = "rag"
             continue
 
-        if query.lower().startswith("/chat"):
+        # if query is /rag reindex, reindex the knowledge base
+        if query.lower() == "/rag reindex":
+            kb.reindex()
+            continue
+
+        if query.lower().strip() == "/chat":
             print("Switching to chat mode...")
             mode = "chat"
             continue

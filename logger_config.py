@@ -3,7 +3,7 @@ import logging
 
 def configure_logging():
     logging.basicConfig(
-        level=logging.CRITICAL,
+        level=logging.INFO,
         format='%(asctime)s - %(levelname)s - [ %(name)s - %(module)s ] - %(message)s'
     )
     logger = logging.getLogger(__name__)

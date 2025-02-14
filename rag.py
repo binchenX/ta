@@ -7,8 +7,8 @@ from langchain.chains import RetrievalQA
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chromadb.config import Settings
-import sqlite3
-import argparse
+
+from logger_config import configure_logging
 
 # Disable PostHog analytics
 os.environ["POSTHOG_API_KEY"] = ""
@@ -18,6 +18,8 @@ chroma_settings = Settings(
     anonymized_telemetry=False,
     allow_reset=True
 )
+
+logger = configure_logging()
 
 class KnowledgeBase:
     def __init__(self, docs_path: str, vector_store_path: str):
@@ -66,23 +68,25 @@ class KnowledgeBase:
         )
         logging.info("KnowledgeBase initialized successfully")
 
-    def _initialize_vector_store(self):
+    def _initialize_vector_store(self, reindex: bool = False):
         logging.debug("Initializing vector store")
-        # Check if vector store exists and has documents
-        if os.path.exists(self.vector_store_path) and len(os.listdir(self.vector_store_path)) > 0:
-            logging.debug("Loading existing vector store")
+        
+        # Check if reindex is True or if vector store exists and has documents
+        if not reindex and os.path.exists(self.vector_store_path) and len(os.listdir(self.vector_store_path)) > 0:
+            logging.info("Loading existing vector store")
             return Chroma(
                 persist_directory=self.vector_store_path,
                 embedding_function=self.embeddings,
                 client_settings=chroma_settings
             )
         
+        # reindex is True or vector store does not exist or is empty
         # Check if there are any markdown files
         markdown_files = [f for f in os.listdir(self.docs_path) if f.endswith('.md')]
         if not markdown_files:
             raise FileNotFoundError(f"No markdown files found in {self.docs_path}")
         
-        logging.debug(f"Found markdown files: {markdown_files}")
+        logging.info(f"Found markdown files: {markdown_files}")
         
         # Load and process documents
         loader = DirectoryLoader(self.docs_path, glob="**/*.md")
@@ -105,6 +109,16 @@ class KnowledgeBase:
         # vector_store.persist()
         logging.info("Vector store initialized and persisted")
         return vector_store
+
+    def reindex(self):
+        logging.info("Reindexing knowledge base")
+        self.vector_store = self._initialize_vector_store(reindex=True)
+        self.qa_chain = RetrievalQA.from_chain_type(
+            llm=self.llm,
+            chain_type="stuff",
+            retriever=self.vector_store.as_retriever()
+        )
+        logging.info("Knowledge base reindexed successfully")
 
     def query(self, query_text: str) -> str:
         logging.debug(f"Querying knowledge base with: {query_text}")
