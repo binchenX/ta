@@ -14,7 +14,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 # Initialize the rich console
-console = Console()
+console = Console(width=100)
 
 # Load environment variables from .env file
 load_dotenv()
