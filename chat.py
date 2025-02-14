@@ -73,7 +73,9 @@ class ChatOpenAI:
     
     def generate_thread_id(self) -> str:
         """Generate a unique thread ID."""
-        return str(len(self.threads) + 1)
+        if self.threads:
+            last_thread_id = max(int(tid) for tid in self.threads.keys())
+            return str(last_thread_id + 1)
 
     def generate_topic_and_summary(self, messages: List[Dict]) -> tuple:
         """Generate a topic and summary for a thread using GPT."""

@@ -73,6 +73,13 @@ def main():
                 print("Invalid thread ID. Please enter a valid number after 'dt'.")
             continue
 
+        # new thread
+        if query.lower() == "/nt":
+            thread_id = chat.generate_thread_id()
+            chat.set_current_thread_id(thread_id)
+            print(f"New thread created with ID: {thread_id}")
+            continue
+
         if not query:
             print("Please enter a valid question.")
             continue
