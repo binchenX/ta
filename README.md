@@ -1,6 +1,6 @@
 # Intelligent Assistant (TA)
 
-A command-line AI/LLM tool to [scratch my own itch](spec).
+A command-line AI/LLM tool to [scratch my own itch](spec.md).
 
 ## License
 
