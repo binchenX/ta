@@ -3,6 +3,7 @@ import argparse
 import signal
 import sys
 import os
+import readline
 
 from logger_config import configure_logging
 from rag import KnowledgeBase
