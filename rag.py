@@ -99,17 +99,48 @@ class KnowledgeBase:
         if doc_path in self.indexed_dirs:
             logger.info(f"Directory already indexed: {doc_path}")
             return
+
         logger.info(f"Indexing directory: {doc_path}")
         loader = DirectoryLoader(doc_path, glob="**/*.md")
-        documents = loader.load()
+
+        # List to store successfully loaded documents
+        valid_documents = []
+        # List to store paths of documents that cause errors
+        error_documents = []
+
+        try:
+            documents = loader.load()
+        except Exception as e:
+            logger.error(
+                f"Failed to load documents from directory: {doc_path}, error: {e}"
+            )
+            return
+
         logger.info(f"Loaded {len(documents)} documents from {doc_path}")
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=200
-        )
-        splits = text_splitter.split_documents(documents)
-        vector_store.add_documents(documents=splits)
-        self.indexed_dirs.append(doc_path)
-        logger.info(f"Indexed and added directory to index record: {doc_path}")
+
+        for doc in documents:
+            try:
+                # Manually split the document to ensure we catch errors per document
+                text_splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=1000, chunk_overlap=200
+                )
+                splits = text_splitter.split_documents([doc])
+                valid_documents.extend(splits)
+            except Exception as e:
+                error_documents.append(doc.metadata["source"])
+                logger.error(
+                    f"Failed to process document {doc.metadata['source']}, error: {e}"
+                )
+
+        if valid_documents:
+            vector_store.add_documents(documents=valid_documents)
+            self.indexed_dirs.append(doc_path)
+            logger.info(f"Indexed and added directory to index record: {doc_path}")
+        else:
+            logger.warning(f"No valid documents found in directory: {doc_path}")
+
+        if error_documents:
+            logger.warning(f"Documents with errors: {error_documents}")
 
     def reindex(self, doc_paths: List[str], force=False):
         """Reindex the knowledge base using new doc paths, if force is True, index from scratch; otherwise, add new directories"""
