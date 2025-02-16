@@ -10,6 +10,10 @@ model_name = "gpt-4o-mini_v2024-07-18"
 embedding_name = "text-embedding-3-large_v1"
 #use OPENAI_BASE_URL if it set, otherwise use this config
 #llm_base_url = "openai"
-rag_doc_paths = [
-    "/doc/path1",
-]
+rag_doc_paths = ["/doc/path1", "/doc/path2"]
+
+[model_aliases]
+# model aliases for easy reference
+# /chat model_alias, will change the chat model to the model_name specified by the alias
+4o = "gpt-4o-mini_v2024-07-18"
+st = "bedrock-claude-3-5-sonnet-v2"
