@@ -1,0 +1,15 @@
+[chat]
+model_name = "gpt-4o-mini_v2024-07-18"
+# used for intelligent session managmment (experimental)
+embedding_name = "text-embedding-3-large_v1"
+#use OPENAI_BASE_URL if it set, otherwise use this config
+#base_url = "openai"
+
+[rag]
+model_name = "gpt-4o-mini_v2024-07-18"
+embedding_name = "text-embedding-3-large_v1"
+#use OPENAI_BASE_URL if it set, otherwise use this config
+#llm_base_url = "openai"
+rag_doc_paths = [
+    "/doc/path1",
+]
