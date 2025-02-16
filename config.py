@@ -16,7 +16,7 @@ class Config:
 
     @property
     def models(self) -> List[str]:
-        return self.config.get("models", [])
+        return list(self.aliases.values())
 
     @property
     def aliases(self) -> Dict[str, str]:
@@ -47,37 +47,32 @@ class Config:
             toml.dump(self.config, f)
 
     def get_rag_model(self) -> str:
-        """Get current chat model"""
-        return self.config.get("rag", {}).get("model_name", "")
+        """Get current rag model"""
+        return self.rag.get("model_name", "")
 
     # New methods for chat model configuration
     def get_chat_model(self) -> str:
         """Get current chat model"""
-        return self.config.get("chat", {}).get("model_name", "")
+        return self.chat.get("model_name", "")
 
     def set_chat_model(self, model_name: str) -> bool:
         """
         Set chat model name. If model_name is an alias, it will be converted to full name.
         Returns True if successful, False if model is not in the allowed models list.
         """
-        # Convert alias to full model name if it's an alias
         full_model_name = self.get_model_from_alias(model_name)
 
-        # Verify the model is in the allowed models list
         if full_model_name not in self.models:
             return False
 
-        # Update the config
         if "chat" not in self.config:
             self.config["chat"] = {}
         self.config["chat"]["model_name"] = full_model_name
 
-        # Save the updated config
         self.save_config()
         return True
 
 
-# Usage example:
 if __name__ == "__main__":
     config = Config()
     print("Models:", config.models)
