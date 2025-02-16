@@ -11,10 +11,6 @@ class Config:
         with open(config_path, "r") as f:
             return toml.load(f)
 
-    def get_config(self) -> Dict[str, str]:
-        return self.config
-
-    @property
     def models(self) -> List[str]:
         return list(self.aliases.values())
 
@@ -33,7 +29,6 @@ class Config:
     def get_model_from_alias(self, alias: str) -> str:
         return self.aliases.get(alias, alias)
 
-    # get model alias from model name
     def get_alias_from_model(self, model_name: str) -> str:
         for alias, full_name in self.aliases.items():
             if full_name == model_name:
@@ -50,7 +45,6 @@ class Config:
         """Get current rag model"""
         return self.rag.get("model_name", "")
 
-    # New methods for chat model configuration
     def get_chat_model(self) -> str:
         """Get current chat model"""
         return self.chat.get("model_name", "")
