@@ -1,15 +1,18 @@
 # Ta
 
-A command-line AI/LLM tool to [scratch my own itch](spec.md).
+A command-line AI/LLM tool.
 
 ## Features (so far)
 
 - Command line
+- Nice Markdown display in terminal
 - Choose model
-- Thread Managment
-- RAG/Knowledge Base
+- Thread Management
+- RAG/Knowledge Base (local markdown files only)
 
-```
+## Help
+
+```bash
 $ ta
 (4o) ❓>: /help
 Commands:
@@ -25,7 +28,9 @@ Commands:
 /rag index -f : force index all directories to knowledge base
 ```
 
-see [example config](./config_example.toml)
+## Config
+
+see [example config](./config_example.toml).
 
 ## License
 
