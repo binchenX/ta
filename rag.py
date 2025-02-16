@@ -8,7 +8,7 @@ from langchain.chains import RetrievalQA
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chromadb.config import Settings
-from logger_config import configure_logging
+from log import configure_logging
 
 # Disable PostHog analytics
 os.environ["POSTHOG_API_KEY"] = ""

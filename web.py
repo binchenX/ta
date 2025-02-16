@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
-from logger_config import configure_logging  # Import the logging configuration
+from log import configure_logging  # Import the logging configuration
 
 logger = configure_logging()
 

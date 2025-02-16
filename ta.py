@@ -7,7 +7,7 @@ import readline
 import toml
 
 
-from logger_config import configure_logging
+from log import configure_logging
 from rag import KnowledgeBase
 from history import ConversationHistory
 from chat import ChatOpenAI

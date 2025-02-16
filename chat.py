@@ -1,7 +1,7 @@
 import openai
 import json
 import os
-from logger_config import configure_logging
+from log import configure_logging
 from typing import Dict, List
 import chromadb
 from chromadb.utils import embedding_functions
