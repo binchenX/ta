@@ -28,9 +28,21 @@ Commands:
 /rag index -f : force index all directories to knowledge base
 ```
 
+## Install
+
+As usual.
+
 ## Config
 
-see [example config](./config_example.toml).
+1. First, set the environment variables:
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key
+export OPENAI_BASE_URL=your_openai_base_url
+```
+
+2. Configure the `model_aliases`, `chat`, and `rag` sections. See the [example
+config](./config_example.toml). Place the config in `~/.td/config.toml`.
 
 ## License
 
