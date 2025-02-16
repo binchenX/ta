@@ -4,7 +4,6 @@ import signal
 import sys
 import os
 import readline
-import toml
 
 
 from log import configure_logging
@@ -14,6 +13,8 @@ from chat import ChatOpenAI
 
 from rich.console import Console
 from rich.markdown import Markdown
+
+from config import Config
 
 # Initialize the rich console
 console = Console(width=100)
@@ -26,12 +27,6 @@ logger = configure_logging()
 def signal_handler(sig, frame):
     print("\nExiting interactive query mode. Goodbye!")
     sys.exit(0)
-
-
-def load_config(file_path):
-    with open(file_path, "r") as f:
-        config = toml.load(f)
-    return config
 
 
 def main():
@@ -47,7 +42,12 @@ def main():
     # for thread similarity matching (experimental)
     chroma_db_path = os.path.join(base_path, "chroma_db")
 
-    config = load_config(os.path.join(base_path, "config.toml"))
+    config_file = "config.toml"
+    # if current directory has config.toml, load it; otherwise load default config
+    if not os.path.exists(config_file):
+        config_file = os.path.join(base_path, "config.toml")
+
+    config = Config(config_file)
 
     # Access the configuration values
     # Ensure OPENAI_API_KEY and OPENAI_BASE_URL are set
@@ -55,13 +55,11 @@ def main():
     openai_base_url = os.getenv("OPENAI_BASE_URL")
 
     if not openai_api_key or not openai_base_url:
-        print(
-            "Error: OPENAI_API_KEY and OPENAI_BASE_URL must be set in the environment."
-        )
+        print("Error: OPENAI_API_KEY and OPENAI_BASE_URL must be set in the environment.")
         sys.exit(1)
 
     rag_enabled = False
-    rag_doc_paths = config["rag"]["rag_doc_paths"]
+    rag_doc_paths = config.rag["rag_doc_paths"]
     if rag_doc_paths:
         valid_paths = []
         for path in rag_doc_paths:
@@ -75,13 +73,13 @@ def main():
             kb = KnowledgeBase(
                 doc_paths=valid_paths,
                 vector_store_path=vector_store_path,
-                rag_config=config["rag"],
+                rag_config=config.rag,
             )
 
     chat = ChatOpenAI(
         save_file=threads_path,
         chroma_db_path=chroma_db_path,
-        chat_config=config["chat"],
+        chat_config=config.chat,
     )
     history = ConversationHistory(db_path=history_db_path)
 
@@ -96,15 +94,18 @@ def main():
 
     while True:
         if mode == "rag":
-            prompt = "[rag] ❓>: "
+            model_alias = config.get_alias_from_model(config.get_rag_model())
+            prompt = f"[rag] ({model_alias}) ❓>: "
         else:
-            prompt = "❓>: "
+            model_alias = config.get_alias_from_model(config.get_chat_model())
+            prompt = f"({model_alias}) ❓>: "
 
         query = input(prompt).strip()
 
         # if query is /help, show help
         if query.lower() == "/help":
             print("Commands:")
+            print("/lm: List models")
             print("/lt: List threads")
             print("/st [thread_id]: Set current thread")
             print("/dt [thread_id]: Delete thread")
@@ -119,6 +120,14 @@ def main():
         if query.lower() == "exit":
             print("Exiting interactive query mode. Goodbye!")
             break
+
+        # list models and alias
+        if query.lower() == "/lm":
+            print("Models:")
+            for model in config.models:
+                alias = config.get_alias_from_model(model)
+                print(f"- {model} ({alias})")
+            continue
 
         # list threads
         if query.lower() == "/lt":
@@ -168,16 +177,28 @@ def main():
             continue
 
         # if query is /rag reindex, reindex the knowledge base
-        if query.lower().startswith("/rag index"):
+        if query.lower().strip() == "/rag index":
             # reload the rag doc paths from config
-            config = load_config("config.toml")
+            config = Config(config_file)
             force_reindex = query.lower().strip() == "/rag index -f"
-            kb.reindex(config["rag"]["rag_doc_paths"], force_reindex)
+            kb.reindex(config.rag["rag_doc_paths"], force_reindex)
             continue
 
         if query.lower().strip() == "/chat":
             print("Switching to chat mode...")
             mode = "chat"
+            continue
+
+        # if /chat xxx, switch to chat model xxx
+        if query.lower().startswith("/chat"):
+            try:
+                model_name = query.split()[1]
+                if config.set_chat_model(model_name):
+                    print(f"Successfully changed chat model to: {config.get_chat_model()}")
+                else:
+                    print(f"Failed to change model - '{model_name}' is not a valid model")
+            except (IndexError, ValueError):
+                print("Invalid model name. Please enter a valid model name after 'chat'.")
             continue
 
         if not query:
