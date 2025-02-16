@@ -111,8 +111,8 @@ def main():
             print("/nt: New thread")
             print("/chat: Switch to chat mode")
             print("/rag: Switch to RAG mode")
-            print("/rag reindex    : index new directory to knowledge base")
-            print("/rag reindex -f : force index all directories to knowledge base")
+            print("/rag index    : index new directory to knowledge base")
+            print("/rag index -f : force index all directories to knowledge base")
             print("/exit: Exit interactive query mode")
             continue
 
@@ -168,10 +168,10 @@ def main():
             continue
 
         # if query is /rag reindex, reindex the knowledge base
-        if query.lower().startswith("/rag reindex"):
+        if query.lower().startswith("/rag index"):
             # reload the rag doc paths from config
             config = load_config("config.toml")
-            force_reindex = query.lower().strip() == "/rag reindex -f"
+            force_reindex = query.lower().strip() == "/rag index -f"
             kb.reindex(config["rag"]["rag_doc_paths"], force_reindex)
             continue
 
