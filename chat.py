@@ -41,9 +41,7 @@ class ChatOpenAI:
         )
 
         self.base_url = os.getenv("OPENAI_BASE_URL", chat_config.get("base_url"))
-        self.client = openai.OpenAI(
-            api_key=os.getenv("OPENAI_API_KEY"), base_url=self.base_url
-        )
+        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url=self.base_url)
         self.model_name = chat_config.get("model_name")
 
         self.load_conversations()
@@ -152,9 +150,7 @@ class ChatOpenAI:
             )
 
             if results and results["distances"] and results["distances"][0]:
-                similarity_score = (
-                    1 - results["distances"][0][0]
-                )  # Convert distance to similarity
+                similarity_score = 1 - results["distances"][0][0]  # Convert distance to similarity
                 logger.info(f"Similarity score: {similarity_score}")
                 if similarity_score > 0.7:  # Threshold
                     return results["ids"][0][0]
@@ -185,9 +181,7 @@ class ChatOpenAI:
         self.add_message(thread_id, "assistant", asssitant_message)
 
         # update topic and summary with lastest exchange, and update the vector db with thread topic
-        topic, summary = self.generate_topic_and_summary(
-            self.threads[thread_id]["messages"]
-        )
+        topic, summary = self.generate_topic_and_summary(self.threads[thread_id]["messages"])
         self.threads[thread_id]["topic"] = topic
         self.threads[thread_id]["summary"] = summary
         self.update_vector_db(thread_id, topic)
@@ -204,9 +198,7 @@ class ChatOpenAI:
         messages += self.get_recent_messages(thread_id)
         messages.append({"role": "user", "content": user_message})
 
-        response = self.client.chat.completions.create(
-            model=self.model_name, messages=messages
-        )
+        response = self.client.chat.completions.create(model=self.model_name, messages=messages)
 
         assistant_reply = response.choices[0].message.content
 

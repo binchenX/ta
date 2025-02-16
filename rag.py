@@ -20,9 +20,7 @@ logger = configure_logging()
 class KnowledgeBase:
     INDEX_RECORD_FILE = "index_record.json"
 
-    def __init__(
-        self, doc_paths: List[str], vector_store_path: str, rag_config: Dict[str, str]
-    ):
+    def __init__(self, doc_paths: List[str], vector_store_path: str, rag_config: Dict[str, str]):
         logger.info("Initializing KnowledgeBase")
         self.llm_api_key = os.getenv("OPENAI_API_KEY")
         if not self.llm_api_key:
@@ -50,9 +48,7 @@ class KnowledgeBase:
             base_url=self.llm_base_url,
         )
         os.makedirs(self.vector_store_path, exist_ok=True)
-        self.index_record_file = os.path.join(
-            self.vector_store_path, self.INDEX_RECORD_FILE
-        )
+        self.index_record_file = os.path.join(self.vector_store_path, self.INDEX_RECORD_FILE)
         self.indexed_dirs = self.load_index_record()
         self.vector_store = self._initialize_vector_store()
         self.qa_chain = RetrievalQA.from_chain_type(
@@ -111,9 +107,7 @@ class KnowledgeBase:
         try:
             documents = loader.load()
         except Exception as e:
-            logger.error(
-                f"Failed to load documents from directory: {doc_path}, error: {e}"
-            )
+            logger.error(f"Failed to load documents from directory: {doc_path}, error: {e}")
             return
 
         logger.info(f"Loaded {len(documents)} documents from {doc_path}")
@@ -121,16 +115,12 @@ class KnowledgeBase:
         for doc in documents:
             try:
                 # Manually split the document to ensure we catch errors per document
-                text_splitter = RecursiveCharacterTextSplitter(
-                    chunk_size=1000, chunk_overlap=200
-                )
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
                 splits = text_splitter.split_documents([doc])
                 valid_documents.extend(splits)
             except Exception as e:
                 error_documents.append(doc.metadata["source"])
-                logger.error(
-                    f"Failed to process document {doc.metadata['source']}, error: {e}"
-                )
+                logger.error(f"Failed to process document {doc.metadata['source']}, error: {e}")
 
         if valid_documents:
             vector_store.add_documents(documents=valid_documents)
@@ -144,9 +134,7 @@ class KnowledgeBase:
 
     def reindex(self, doc_paths: List[str], force=False):
         """Reindex the knowledge base using new doc paths, if force is True, index from scratch; otherwise, add new directories"""
-        logger.debug(
-            f"Reindexing knowledge base with new doc paths: {doc_paths}, force: {force}"
-        )
+        logger.debug(f"Reindexing knowledge base with new doc paths: {doc_paths}, force: {force}")
         if force:
             self.doc_paths = doc_paths
             self.vector_store = self._initialize_vector_store(reindex=True)
