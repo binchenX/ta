@@ -11,6 +11,7 @@ class Config:
         with open(config_path, "r") as f:
             return toml.load(f)
 
+    @property
     def models(self) -> List[str]:
         return list(self.aliases.values())
 
