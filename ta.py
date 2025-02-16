@@ -47,7 +47,7 @@ def main():
     # for thread similarity matching (experimental)
     chroma_db_path = os.path.join(base_path, "chroma_db")
 
-    config = load_config("config.toml")
+    config = load_config(os.path.join(base_path, "config.toml"))
 
     # Access the configuration values
     # Ensure OPENAI_API_KEY and OPENAI_BASE_URL are set
