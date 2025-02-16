@@ -4,6 +4,8 @@ import signal
 import sys
 import os
 import readline
+import toml
+
 
 from logger_config import configure_logging
 from rag import KnowledgeBase
@@ -26,6 +28,12 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
+def load_config(file_path):
+    with open(file_path, "r") as f:
+        config = toml.load(f)
+    return config
+
+
 def main():
     parser = argparse.ArgumentParser(description="iTelligent Assistant (ta)")
     args = parser.parse_args()
@@ -39,15 +47,42 @@ def main():
     # for thread similarity matching (experimental)
     chroma_db_path = os.path.join(base_path, "chroma_db")
 
+    config = load_config("config.toml")
+
+    # Access the configuration values
+    # Ensure OPENAI_API_KEY and OPENAI_BASE_URL are set
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_base_url = os.getenv("OPENAI_BASE_URL")
+
+    if not openai_api_key or not openai_base_url:
+        print(
+            "Error: OPENAI_API_KEY and OPENAI_BASE_URL must be set in the environment."
+        )
+        sys.exit(1)
+
     rag_enabled = False
-    rag_docs_path = os.getenv("RAG_DOC_PATH")
+    rag_doc_paths = config["rag"]["rag_doc_paths"]
+    if rag_doc_paths:
+        valid_paths = []
+        for path in rag_doc_paths:
+            if os.path.exists(path):
+                valid_paths.append(path)
+            else:
+                print(f"Invalid path for rag: {path}")
+        if valid_paths:
+            rag_enabled = True
+            logger.info(f"RAG enabled with doc paths: {valid_paths}")
+            kb = KnowledgeBase(
+                doc_paths=valid_paths,
+                vector_store_path=vector_store_path,
+                rag_config=config["rag"],
+            )
 
-    # if RAG_DOC_PATH is not set, don't enable RAG mode
-    if rag_docs_path:
-        rag_enabled = True
-        kb = KnowledgeBase(docs_path=rag_docs_path, vector_store_path=vector_store_path)
-
-    chat = ChatOpenAI(save_file=threads_path, chroma_db_path=chroma_db_path)
+    chat = ChatOpenAI(
+        save_file=threads_path,
+        chroma_db_path=chroma_db_path,
+        chat_config=config["chat"],
+    )
     history = ConversationHistory(db_path=history_db_path)
 
     thread_id = chat.generate_thread_id()

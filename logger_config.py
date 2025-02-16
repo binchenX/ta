@@ -4,10 +4,10 @@ import logging
 def configure_logging():
     logging.basicConfig(
         level=logging.CRITICAL,
-        format="%(asctime)s - %(levelname)s - [ %(name)s - %(module)s ] - %(message)s",
+        format="%(asctime)s - %(levelname)s - [ %(module)s ] - %(message)s",
     )
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.CRITICAL)
+    logger.setLevel(logging.INFO)
 
     # turn on when debugging
     # logging.getLogger("requests").setLevel(logging.DEBUG)

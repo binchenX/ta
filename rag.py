@@ -1,5 +1,7 @@
 import os
 import logging
+from typing import List
+from typing import Dict
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
@@ -20,37 +22,45 @@ logger = configure_logging()
 
 
 class KnowledgeBase:
-    def __init__(self, docs_path: str, vector_store_path: str):
+    def __init__(
+        self, doc_paths: List[str], vector_store_path: str, rag_config: Dict[str, str]
+    ):
         logging.info("Initializing KnowledgeBase")
 
         # Initialize OpenAI API
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
-        if not self.openai_api_key:
+        self.llm_api_key = os.getenv("OPENAI_API_KEY")
+        if not self.llm_api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
 
-        self.openai_base_url = os.getenv("OPENAI_BASE_URL")
+        # Load configuration values, giving precedence to environment variables
+        self.llm_base_url = os.getenv("OPENAI_BASE_URL", rag_config.get("llm_base_url"))
+        self.model_name = rag_config.get("model_name")
+        self.embedding_name = rag_config.get("embedding_name")
+        # todo - use one doc only for now
+        self.docs_path = doc_paths[0]
 
-        # Get model name and embedding name from environment variables
-        self.model_name = os.getenv("MODEL_NAME", "gpt-4o-mini_v2024-07-18")
-        self.embedding_name = os.getenv("EMBEDDING_NAME", "text-embedding-3-large_v1")
+        # log all rg configration values
+        logger.info(f"llm_base_url: {self.llm_base_url}")
+        logger.info(f"model_name: {self.model_name}")
+        logger.info(f"embedding_name: {self.embedding_name}")
+        logger.info(f"docs_path: {self.docs_path}")
 
         # Initialize language model
         self.llm = ChatOpenAI(
             temperature=0,
             model_name=self.model_name,
-            api_key=self.openai_api_key,
-            base_url=self.openai_base_url,
+            api_key=self.llm_api_key,
+            base_url=self.llm_base_url,
         )
 
         # Initialize embeddings with the specified model
         self.embeddings = OpenAIEmbeddings(
             model=self.embedding_name,
-            api_key=self.openai_api_key,
-            base_url=self.openai_base_url,
+            api_key=self.llm_api_key,
+            base_url=self.llm_base_url,
         )
 
         self.vector_store_path = vector_store_path
-        self.docs_path = docs_path
 
         # Create directories if they don't exist
         os.makedirs(self.docs_path, exist_ok=True)

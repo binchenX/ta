@@ -8,7 +8,7 @@ from chromadb.utils import embedding_functions
 from chromadb.config import Settings
 
 logger = configure_logging()
-client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 # Disable ChromaDB telemetry
 chroma_settings = Settings(anonymized_telemetry=False, allow_reset=True)
 
@@ -18,6 +18,7 @@ class ChatOpenAI:
         self,
         save_file,
         chroma_db_path,
+        chat_config=Dict[str, str],
         history_limit=5,
     ):
         self.threads: Dict[str, Dict] = {}
@@ -31,14 +32,19 @@ class ChatOpenAI:
 
         # Use OpenAI embeddings
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model_name=os.getenv("EMBEDDING_NAME", "text-embedding-3-large_v1"),
+            api_key=os.getenv("OPENAI_API_KEY"), model_name=os.getenv("EMBEDDING_NAME")
         )
 
         # Create or get the collection
         self.collection = self.chroma_client.get_or_create_collection(
             name="thread_summaries", embedding_function=self.embedding_function
         )
+
+        self.base_url = os.getenv("OPENAI_BASE_URL", chat_config.get("base_url"))
+        self.client = openai.OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"), base_url=self.base_url
+        )
+        self.model_name = chat_config.get("model_name")
 
         self.load_conversations()
 
@@ -102,8 +108,8 @@ class ChatOpenAI:
         TOPIC: [topic]
         SUMMARY: [summary]"""
 
-        response = client.chat.completions.create(
-            model=os.getenv("MODEL_NAME", "gpt-4-mini_v2024-07-18"),
+        response = self.client.chat.completions.create(
+            model=self.model_name,
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -198,8 +204,8 @@ class ChatOpenAI:
         messages += self.get_recent_messages(thread_id)
         messages.append({"role": "user", "content": user_message})
 
-        response = client.chat.completions.create(
-            model=os.getenv("MODEL_NAME"), messages=messages
+        response = self.client.chat.completions.create(
+            model=self.model_name, messages=messages
         )
 
         assistant_reply = response.choices[0].message.content
