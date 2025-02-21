@@ -5,15 +5,61 @@ from openai import OpenAI
 import asyncio
 import json
 from log import configure_logging
+from typing import List, Optional
+from mcp import Tool  # Assuming Tool is imported from mcp
 
 logger = configure_logging()
 
 
-def find_tool_by_name(tools, name):
-    for tool in tools:
-        if tool.name == name:
-            return tool
-    return None
+async def select_tool_by_description(
+    tools: List[Tool],
+    client: OpenAI,
+    model: str,
+    purpose: str,
+    max_tokens: int = 50,
+    temperature: float = 0.5,
+) -> Optional[Tool]:
+    """Select a tool from a list based on its description using an LLM."""
+    if not tools:
+        logger.info("No tools provided for selection.")
+        return None
+
+    # Prepare tool descriptions for LLM
+    tools_descriptions = [
+        f"Tool '{tool.name}': {tool.description or 'No description provided'}" for tool in tools
+    ]
+    tools_text = "\n".join(tools_descriptions)
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"You are a tool selector. Given a list of tools with descriptions, identify which tool is designed to {purpose}. "
+                        'Return the tool name in JSON format, e.g., {"tool_name": "tool_name_here"}. '
+                        'If no suitable tool is found, return {"tool_name": null}.'
+                    ),
+                },
+                {"role": "user", "content": tools_text},
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        raw_content = response.choices[0].message.content.strip()
+        logger.info(f"LLM tool selection response: {raw_content}")
+        result = json.loads(raw_content)
+        selected_tool_name = result.get("tool_name")
+
+        # Find the matching tool
+        for tool in tools:
+            if tool.name == selected_tool_name:
+                return tool
+        return None
+    except Exception as e:
+        logger.error(f"Error selecting tool with LLM: {str(e)}")
+        return None
 
 
 class ProofReadAgentMCP:
@@ -24,6 +70,28 @@ class ProofReadAgentMCP:
         self.client = OpenAI(api_key=api_key)
         self.model = "gpt-4o-mini_v2024-07-18"
         self.mcp_uri = mcp_uri
+        # Discover tools during initialization
+        self.file_read_tool = asyncio.run(self._discover_tools())
+        if not self.file_read_tool:
+            logger.warning("No file-reading tool found during initialization.")
+        else:
+            logger.info(
+                f"Initialized with file-reading tool: {self.file_read_tool.name} - {self.file_read_tool.description}"
+            )
+
+    async def _discover_tools(self):
+        """Discover available MCP tools and select a file-reading tool."""
+        async with sse_client(url=self.mcp_uri) as streams:
+            async with ClientSession(*streams) as session:
+                await session.initialize()
+                tools_result = await session.list_tools()
+                logger.info(f"Available tools: {tools_result}")
+                return await select_tool_by_description(
+                    tools=tools_result.tools,
+                    client=self.client,
+                    model=self.model,
+                    purpose="read file contents",
+                )
 
     def _infer_intent_and_file(self, user_input):
         try:
@@ -70,24 +138,20 @@ class ProofReadAgentMCP:
         intent_data = self._infer_intent_and_file(user_input)
         if intent_data.get("intent") == "proofread" and "file" in intent_data:
             file = intent_data["file"]
+            if not self.file_read_tool:
+                return "No tool available to read files."
             async with sse_client(url=self.mcp_uri) as streams:
                 async with ClientSession(*streams) as session:
                     await session.initialize()
-                    tools_result = await session.list_tools()
-                    logger.info(f"Available tools: {tools_result}")
-                    read_file_tool = find_tool_by_name(tools_result.tools, "read_file")
-                    if read_file_tool:
-                        # todo: deal with error
-                        response = await session.call_tool("read_file", {"file": file})
-                        if response.isError:
-                            logger.error(f"error calling tools {response.content[0].text}")
-                        else:
-                            logger.info(f"response {response}")
-                            file_content = response.content[0].text
-                            proofread_result = self._proofread_with_openai(file_content)
-                            return proofread_result
+                    response = await session.call_tool(self.file_read_tool.name, {"file": file})
+                    if response.isError:
+                        logger.error(f"Error calling tool: {response.content[0].text}")
+                        return f"Error: {response.content[0].text}"
                     else:
-                        return "Required tools are not available."
+                        logger.info(f"Response: {response}")
+                        file_content = response.content[0].text
+                        proofread_result = self._proofread_with_openai(file_content)
+                        return proofread_result
         return "Sorry, I couldn't understand your request. Try asking to proofread a file, e.g., 'Check example.txt'."
 
     def proofread(self, user_input):
