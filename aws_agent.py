@@ -11,8 +11,8 @@ class AWSAgent:
         # Load AWS credentials from the default profile
         session = boto3.Session()
         self.credentials = session.get_credentials()
-        self.model_name = "gpt-4o-mini_v2024-07-18"  # Your custom model name
-        self.api_key = os.environ.get("OPENAI_API_KEY")  # Set your OpenAI API key
+        self.model_name = "gpt-4o-mini_v2024-07-18"
+        self.api_key = os.environ.get("OPENAI_API_KEY")
         # Initialize AWS S3 client with the loaded credentials
         self.s3_client = boto3.client("s3")
         # Define available functions
