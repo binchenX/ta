@@ -1,7 +1,9 @@
-import os
 import json
+import os
 import sys
+
 from openai import OpenAI
+
 from log import configure_logging
 
 logger = configure_logging()
@@ -83,6 +85,13 @@ class ProofReadAgent:
             return self._proofread_with_openai(file_content)
         return "Sorry, I couldn’t understand your request. Try asking to proofread a file, e.g., 'Check example.txt'."
 
+    def proofread_file(self, file_path):
+        """Proofread a file without intent inference."""
+        file_content = self._read_file(file_path)
+        if "Error" in file_content:
+            return file_content
+        return self._proofread_with_openai(file_content)
+
 
 # Example usage
 if __name__ == "__main__":
@@ -95,5 +104,7 @@ if __name__ == "__main__":
     user_input = f"Please proofread {filename}"
 
     agent = ProofReadAgent()
+    response = agent.proofread(user_input)
+    print(response)
     response = agent.proofread(user_input)
     print(response)

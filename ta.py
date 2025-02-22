@@ -5,10 +5,10 @@ import sys
 
 from dotenv import load_dotenv
 
-from chat import ChatOpenAI
 from cmd_chat import run_interactive_chat
 from config import Config
 from log import configure_logging
+from proofread_agent import ProofReadAgent
 from rag import KnowledgeBase
 
 # Load environment variables from .env file
@@ -21,10 +21,11 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-def run_proofread(filename):
-    # Placeholder for proofreading logic
-    print(f"Proofreading {filename}... (Placeholder implementation)")
-    return "Proofreading not yet implemented."
+def run_proofread(filename) -> str:
+    logger.debug(f"Proofreading file: {filename}")
+    agent = ProofReadAgent()
+    response = agent.proofread_file(filename)
+    return response
 
 
 def main():
@@ -67,21 +68,15 @@ def main():
     base_path = os.path.expanduser("~/.ta")
     vector_store_path = os.path.join(base_path, "vector_store")
     os.makedirs(vector_store_path, exist_ok=True)
-    history_db_path = os.path.join(base_path, "history.db")
-    threads_path = os.path.join(base_path, "threads.json")
-    chroma_db_path = os.path.join(base_path, "chroma_db")
     config_file = (
         "config.toml" if os.path.exists("config.toml") else os.path.join(base_path, "config.toml")
     )
     config = Config(config_file)
 
     if args.command == "proofread":
-        run_proofread(args.filename)
+        print(run_proofread(args.filename))
+        exit(0)
     elif args.command == "model":
-        chat = ChatOpenAI(
-            save_file=threads_path, chroma_db_path=chroma_db_path, chat_config=config.chat
-        )
-
         if args.model_command == "list":
             print("Models:")
             for model in config.models:
