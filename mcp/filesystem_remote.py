@@ -1,6 +1,8 @@
+import asyncio
+
 from mcp.server import FastMCP
 
-mcp = FastMCP("ta-filesystem")
+mcp = FastMCP("ta-filesystem-remote")
 
 
 @mcp.tool()
@@ -20,5 +22,15 @@ async def read_file(file: str) -> str:
         raise Exception(f"Error reading file: {str(e)}")
 
 
+async def start_server():
+    await mcp.run_sse_async()
+
+
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(start_server())
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.close()

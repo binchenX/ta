@@ -1,9 +1,10 @@
-import os
-from typing import List, Dict
-import boto3
-from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, AIMessage, FunctionMessage
 import json
+import os
+from typing import Dict, List
+
+import boto3
+from langchain.schema import AIMessage, FunctionMessage, HumanMessage
+from langchain_openai import ChatOpenAI
 
 
 class AWSAgent:
@@ -107,4 +108,5 @@ class AWSAgent:
 
 if __name__ == "__main__":
     agent = AWSAgent()
+    agent.chat()
     agent.chat()

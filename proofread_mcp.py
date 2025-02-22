@@ -1,12 +1,14 @@
-import os
-from mcp.client.sse import sse_client
-from mcp import ClientSession
-from openai import OpenAI
 import asyncio
 import json
+import os
+from typing import List, Optional, Union
+
+from openai import OpenAI
+
 from log import configure_logging
-from typing import List, Optional
-from mcp import Tool  # Assuming Tool is imported from mcp
+from mcp import ClientSession, StdioServerParameters, Tool
+from mcp.client.sse import sse_client
+from mcp.client.stdio import stdio_client
 
 logger = configure_logging()
 
@@ -24,7 +26,6 @@ async def select_tool_by_description(
         logger.info("No tools provided for selection.")
         return None
 
-    # Prepare tool descriptions for LLM
     tools_descriptions = [
         f"Tool '{tool.name}': {tool.description or 'No description provided'}" for tool in tools
     ]
@@ -52,7 +53,6 @@ async def select_tool_by_description(
         result = json.loads(raw_content)
         selected_tool_name = result.get("tool_name")
 
-        # Find the matching tool
         for tool in tools:
             if tool.name == selected_tool_name:
                 return tool
@@ -63,14 +63,15 @@ async def select_tool_by_description(
 
 
 class ProofReadAgentMCP:
-    def __init__(self, api_key=None, mcp_uri="http://127.0.0.1:8000/sse"):
+    def __init__(self, api_key=None, script_path=None, mcp_uri=None):
         api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OpenAI API key not provided or found in environment.")
         self.client = OpenAI(api_key=api_key)
         self.model = "gpt-4o-mini_v2024-07-18"
-        self.mcp_uri = mcp_uri
-        # Discover tools during initialization
+        self.script_path = script_path or os.getenv("MCP_SCRIPT_PATH", "filesystem.py")
+        self.mcp_uri = mcp_uri or os.getenv("MCP_URI", "http://127.0.0.1:8000/sse")
+        self.use_stdio = bool(script_path)  # Prefer Stdio if script_path is provided
         self.file_read_tool = asyncio.run(self._discover_tools())
         if not self.file_read_tool:
             logger.warning("No file-reading tool found during initialization.")
@@ -80,18 +81,34 @@ class ProofReadAgentMCP:
             )
 
     async def _discover_tools(self):
-        """Discover available MCP tools and select a file-reading tool."""
-        async with sse_client(url=self.mcp_uri) as streams:
-            async with ClientSession(*streams) as session:
-                await session.initialize()
-                tools_result = await session.list_tools()
-                logger.info(f"Available tools: {tools_result}")
-                return await select_tool_by_description(
-                    tools=tools_result.tools,
-                    client=self.client,
-                    model=self.model,
-                    purpose="read file contents",
-                )
+        """Discover available MCP tools from either Stdio or SSE transport."""
+        if self.use_stdio:
+            server_params = StdioServerParameters(
+                command="python", args=[self.script_path], env=None
+            )
+            async with stdio_client(server_params) as streams:
+                async with ClientSession(*streams) as session:
+                    await session.initialize()
+                    tools_result = await session.list_tools()
+                    logger.info(f"Stdio tools: {tools_result}")
+                    return await select_tool_by_description(
+                        tools=tools_result.tools,
+                        client=self.client,
+                        model=self.model,
+                        purpose="read file contents",
+                    )
+        else:
+            async with sse_client(url=self.mcp_uri) as streams:
+                async with ClientSession(*streams) as session:
+                    await session.initialize()
+                    tools_result = await session.list_tools()
+                    logger.info(f"SSE tools: {tools_result}")
+                    return await select_tool_by_description(
+                        tools=tools_result.tools,
+                        client=self.client,
+                        model=self.model,
+                        purpose="read file contents",
+                    )
 
     def _infer_intent_and_file(self, user_input):
         try:
@@ -140,18 +157,35 @@ class ProofReadAgentMCP:
             file = intent_data["file"]
             if not self.file_read_tool:
                 return "No tool available to read files."
-            async with sse_client(url=self.mcp_uri) as streams:
-                async with ClientSession(*streams) as session:
-                    await session.initialize()
-                    response = await session.call_tool(self.file_read_tool.name, {"file": file})
-                    if response.isError:
-                        logger.error(f"Error calling tool: {response.content[0].text}")
-                        return f"Error: {response.content[0].text}"
-                    else:
-                        logger.info(f"Response: {response}")
-                        file_content = response.content[0].text
-                        proofread_result = self._proofread_with_openai(file_content)
-                        return proofread_result
+            if self.use_stdio:
+                server_params = StdioServerParameters(
+                    command="python", args=[self.script_path], env=None
+                )
+                async with stdio_client(server_params) as streams:
+                    async with ClientSession(*streams) as session:
+                        await session.initialize()
+                        response = await session.call_tool(self.file_read_tool.name, {"file": file})
+                        if response.isError:
+                            logger.error(f"Error calling Stdio tool: {response.content[0].text}")
+                            return f"Error: {response.content[0].text}"
+                        else:
+                            logger.info(f"Stdio response: {response}")
+                            file_content = response.content[0].text
+                            proofread_result = self._proofread_with_openai(file_content)
+                            return proofread_result
+            else:
+                async with sse_client(url=self.mcp_uri) as streams:
+                    async with ClientSession(*streams) as session:
+                        await session.initialize()
+                        response = await session.call_tool(self.file_read_tool.name, {"file": file})
+                        if response.isError:
+                            logger.error(f"Error calling SSE tool: {response.content[0].text}")
+                            return f"Error: {response.content[0].text}"
+                        else:
+                            logger.info(f"SSE response: {response}")
+                            file_content = response.content[0].text
+                            proofread_result = self._proofread_with_openai(file_content)
+                            return proofread_result
         return "Sorry, I couldn't understand your request. Try asking to proofread a file, e.g., 'Check example.txt'."
 
     def proofread(self, user_input):
@@ -162,10 +196,28 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) < 2:
-        print("Usage: python proofread_agent_mcp.py <filename>")
+        print("Usage: python proofread_agent_mcp.py <filename> [--stdio | --sse URI]")
         sys.exit(1)
+
     filename = sys.argv[1]
     user_input = f"Please proofread {filename}"
-    agent = ProofReadAgentMCP()
+
+    # Parse optional arguments
+    script_path = None
+    mcp_uri = None
+    if "--stdio" in sys.argv:
+        script_path = (
+            sys.argv[sys.argv.index("--stdio") + 1]
+            if sys.argv.index("--stdio") + 1 < len(sys.argv)
+            else "filesystem.py"
+        )
+    elif "--sse" in sys.argv:
+        mcp_uri = (
+            sys.argv[sys.argv.index("--sse") + 1]
+            if sys.argv.index("--sse") + 1 < len(sys.argv)
+            else "http://127.0.0.1:8000/sse"
+        )
+
+    agent = ProofReadAgentMCP(script_path=script_path, mcp_uri=mcp_uri)
     response = agent.proofread(user_input)
     print(response)
