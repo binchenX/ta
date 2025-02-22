@@ -148,7 +148,7 @@ def run_interactive_chat():
             elif mode == "chat":
                 response = chat.query(query)
 
-            print(f"🤖:\n")
+            print("🤖:\n")
             markdown_response = Markdown(response)
             console.print(markdown_response)
             history.save(query, response)

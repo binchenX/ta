@@ -2,9 +2,11 @@ import argparse
 import os
 import signal
 import sys
+from typing import Callable, Dict
 
 from dotenv import load_dotenv
 
+from chat import ChatOpenAI
 from cmd_chat import run_interactive_chat
 from config import Config
 from log import configure_logging
@@ -21,19 +23,66 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-def run_proofread(filename) -> str:
+def run_proofread(filename: str) -> str:
     logger.debug(f"Proofreading file: {filename}")
     agent = ProofReadAgent()
-    response = agent.proofread_file(filename)
-    return response
+    return agent.proofread_file(filename)
+
+
+def handle_proofread(args):
+    print(run_proofread(args.filename))
+    sys.exit(0)
+
+
+def handle_model_list(args, config):
+    print("Models:")
+    for model in config.models:
+        alias = config.get_alias_from_model(model)
+        print(f"- {model} ({alias})")
+    sys.exit(0)
+
+
+def handle_model_set(args, config):
+    if config.set_chat_model(args.model_name):
+        print(f"Successfully changed chat model to: {config.get_chat_model()}")
+    else:
+        print(f"Failed to change model - '{args.model_name}' is not a valid model")
+    sys.exit(0)
+
+
+def handle_model_help(args, parser):
+    parser.print_help()
+    sys.exit(1)
+
+
+def handle_rag_index(args, kb):
+    kb.reindex(kb.doc_paths, force_reindex=args.force)
+    print("Indexing completed." if not args.force else "Forced reindexing completed.")
+    sys.exit(0)
+
+
+def handle_rag_addpath(args, config, kb, config_file):
+    if not os.path.exists(args.path):
+        print(f"Error: Path '{args.path}' does not exist.")
+        sys.exit(1)
+    config.rag["rag_doc_paths"].append(args.path)
+    config.save_config(config_file)
+    kb.reindex([args.path], force_reindex=False)
+    print(f"Added and indexed path: {args.path}")
+    sys.exit(0)
+
+
+def handle_rag_help(args, parser):
+    parser.print_help()
+    sys.exit(1)
 
 
 def main():
     parser = argparse.ArgumentParser(description="iTelligent Assistant (ta)")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Subcommand: proofread
-    proofread_parser = subparsers.add_parser("proofread", help="Proofread a file")
+    # Subcommand: proofread (with alias 'pf')
+    proofread_parser = subparsers.add_parser("proofread", aliases=["pf"], help="Proofread a file")
     proofread_parser.add_argument("filename", help="Path to the file to proofread")
 
     # Subcommand: model
@@ -73,49 +122,40 @@ def main():
     )
     config = Config(config_file)
 
-    if args.command == "proofread":
-        print(run_proofread(args.filename))
-        exit(0)
-    elif args.command == "model":
-        if args.model_command == "list":
-            print("Models:")
-            for model in config.models:
-                alias = config.get_alias_from_model(model)
-                print(f"- {model} ({alias})")
-        elif args.model_command == "set":
-            if config.set_chat_model(args.model_name):
-                print(f"Successfully changed chat model to: {config.get_chat_model()}")
-            else:
-                print(f"Failed to change model - '{args.model_name}' is not a valid model")
-        else:
-            model_parser.print_help()
-            sys.exit(1)
-    elif args.command == "rag":
-        if not os.path.exists(vector_store_path):
-            print(
-                "RAG is not enabled or initialized. Please run in interactive mode first with valid RAG paths."
-            )
-            sys.exit(1)
-        kb = KnowledgeBase(
+    # Command dispatch dictionary with alias mapping
+    command_handlers: Dict[str, Callable] = {
+        "proofread": lambda: handle_proofread(args),
+        "pf": lambda: handle_proofread(args),  # Explicitly map alias
+        "model": {
+            "list": lambda: handle_model_list(args, config),
+            "set": lambda: handle_model_set(args, config),
+            None: lambda: handle_model_help(args, model_parser),
+        },
+        "rag": {
+            "index": lambda: handle_rag_index(args, kb),
+            "addpath": lambda: handle_rag_addpath(args, config, kb, config_file),
+            None: lambda: handle_rag_help(args, rag_parser),
+        },
+    }
+
+    # Initialize dependencies only if needed
+    kb = (
+        KnowledgeBase(
             doc_paths=config.rag["rag_doc_paths"],
             vector_store_path=vector_store_path,
             rag_config=config.rag,
         )
-        if args.rag_command == "index":
-            kb.reindex(config.rag["rag_doc_paths"], force_reindex=args.force)
-            print("Indexing completed." if not args.force else "Forced reindexing completed.")
-        elif args.rag_command == "addpath":
-            if not os.path.exists(args.path):
-                print(f"Error: Path '{args.path}' does not exist.")
-                sys.exit(1)
-            # Add the new path to config and reindex
-            config.rag["rag_doc_paths"].append(args.path)
-            config.save_config(config_file)
-            kb.reindex(config.rag["rag_doc_paths"], False)
-            print(f"Added and indexed path: {args.path}")
-        else:
-            rag_parser.print_help()
-            sys.exit(1)
+        if args.command == "rag" and os.path.exists(vector_store_path)
+        else None
+    )
+
+    # Execute the appropriate command handler
+    handler = command_handlers.get(args.command)
+    if handler:
+        if isinstance(handler, dict):
+            subcommand = getattr(args, f"{args.command}_command", None)
+            handler = handler.get(subcommand, handler[None])
+        handler()
     else:
         run_interactive_chat()
 
