@@ -1,5 +1,6 @@
+from typing import Dict, List
+
 import toml
-from typing import List, Dict, Optional
 
 
 class Config:
@@ -84,4 +85,5 @@ if __name__ == "__main__":
     # Example: try to set an invalid model
     invalid_model = "invalid-model"
     if not config.set_chat_model(invalid_model):
+        print(f"Failed to change model - '{invalid_model}' is not a valid model")
         print(f"Failed to change model - '{invalid_model}' is not a valid model")

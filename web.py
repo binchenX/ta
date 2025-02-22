@@ -1,12 +1,11 @@
 import os
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+
 from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
 from log import configure_logging  # Import the logging configuration
 
 logger = configure_logging()
-
-import os
 
 
 class DirectQueryLangchain:
@@ -37,5 +36,7 @@ class DirectQueryLangchain:
         if hasattr(response, "content"):
             return response.content
         else:
+            logger.error("Invalid response format received")
+            return "Error: Invalid response format received"
             logger.error("Invalid response format received")
             return "Error: Invalid response format received"
