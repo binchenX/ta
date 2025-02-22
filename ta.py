@@ -6,7 +6,6 @@ from typing import Callable, Dict
 
 from dotenv import load_dotenv
 
-from chat import ChatOpenAI
 from cmd_chat import run_interactive_chat
 from config import Config
 from log import configure_logging

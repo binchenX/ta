@@ -1,4 +1,6 @@
+import atexit
 import os
+import readline
 import sys
 
 from rich.console import Console
@@ -10,10 +12,35 @@ from history import ConversationHistory
 from log import configure_logging
 from rag import KnowledgeBase
 
-logger = configure_logging()
+# Configure readline
+HISTFILE = os.path.expanduser("~/.ta_history")
+try:
+    readline.read_history_file(HISTFILE)
+    readline.set_history_length(1000)
+except FileNotFoundError:
+    pass
 
+# Save history on exit
+atexit.register(readline.write_history_file, HISTFILE)
+
+# Enable tab completion
+readline.parse_and_bind("tab: complete")
+
+logger = configure_logging()
 # Initialize the rich console
 console = Console(width=120)
+
+
+def get_input(prompt):
+    """Helper function to get input with proper line editing capabilities"""
+    try:
+        return input(prompt).strip()
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user")
+        return ""
+    except EOFError:
+        print("\nEOF detected. Exiting...")
+        sys.exit(0)
 
 
 def run_interactive_chat():
@@ -54,11 +81,10 @@ def run_interactive_chat():
         chroma_db_path=chroma_db_path,
         chat_config=config.chat,
     )
-    history = ConversationHistory(db_path=history_db_path)
 
+    history = ConversationHistory(db_path=history_db_path)
     thread_id = chat.generate_thread_id()
     chat.set_current_thread_id(thread_id)
-
     mode = "chat"
 
     while True:
@@ -66,7 +92,7 @@ def run_interactive_chat():
             config.get_chat_model() if mode == "chat" else config.get_rag_model()
         )
         prompt = f"[rag] ({model_alias}) ❓>: " if mode == "rag" else f"({model_alias}) ❓>: "
-        query = input(prompt).strip()
+        query = get_input(prompt)
 
         if query.lower() == "/help":
             print("Commands:")
@@ -147,7 +173,6 @@ def run_interactive_chat():
                 response = kb.query(query)
             elif mode == "chat":
                 response = chat.query(query)
-
             print("🤖:\n")
             markdown_response = Markdown(response)
             console.print(markdown_response)
