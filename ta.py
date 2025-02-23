@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 from cmd_chat import run_interactive_chat
 from config import Config
+from hackernews import HackerNews
 from log import configure_logging
 from proofread_agent import ProofReadAgent
 from rag import KnowledgeBase
@@ -26,6 +27,13 @@ def run_proofread(filename: str) -> str:
     logger.debug(f"Proofreading file: {filename}")
     agent = ProofReadAgent()
     return agent.proofread_file(filename)
+
+
+def handle_fetch_news(args):
+    # fetch hacker news only at this point
+    hn = HackerNews()
+    hn.do(limit=args.limit)
+    sys.exit(0)
 
 
 def handle_proofread(args):
@@ -109,6 +117,14 @@ def main():
     addpath_parser = rag_subparsers.add_parser("addpath", help="Add a new path to RAG and index it")
     addpath_parser.add_argument("path", help="Path to be added and indexed")
 
+    # Subcommand: fetchnews
+    fetchnews_parser = subparsers.add_parser(
+        "fetchnews", help="Fetch and summarize Hacker News stories"
+    )
+    fetchnews_parser.add_argument(
+        "-l", "--limit", type=int, default=2, help="Number of stories to fetch"
+    )
+
     args = parser.parse_args()
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -135,6 +151,7 @@ def main():
             "addpath": lambda: handle_rag_addpath(args, config, kb, config_file),
             None: lambda: handle_rag_help(args, rag_parser),
         },
+        "fetchnews": lambda: handle_fetch_news(args),
     }
 
     # Initialize dependencies only if needed
