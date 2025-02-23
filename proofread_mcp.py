@@ -19,8 +19,7 @@ class ToolConverter:
         """
         Convert MCP tool definitions to OpenAI-compatible function definitions.
         Args:
-            mcp_tools (list): A list of MCP tool objects. Each tool object must have
-                              'name', 'description', and 'input_schema' attributes.
+            mcp_tools (list): A list of MCP tool objects. Each tool object must have 'name', 'description', and 'input_schema' attributes.
         Returns:
             list: A list of OpenAI-compatible function definitions.
         """
@@ -42,8 +41,7 @@ class ToolConverter:
         """
         Convert MCP tool definitions to Anthropic-compatible function definitions.
         Args:
-            mcp_tools (list): A list of MCP tool objects. Each tool object must have
-                              'name', 'description', and 'input_schema' attributes.
+            mcp_tools (list): A list of MCP tool objects. Each tool object must have 'name', 'description', and 'input_schema' attributes.
         Returns:
             list: A list of Anthropic-compatible function definitions.
         """
@@ -131,15 +129,42 @@ class MPCToolSelect:
             return None
 
 
+class ProofReadLLM:
+    def __init__(self, client: OpenAI, model: str):
+        self.client = client
+        self.model = model
+
+    def proofread(self, text: str) -> str:
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a proofreading assistant. Analyze the given text and provide specific suggestions for spelling, grammar, and clarity improvements. Include the original text and list changes in your response.",
+                    },
+                    {"role": "user", "content": f"Proofread this: {text}"},
+                ],
+                max_tokens=150,
+                temperature=0.7,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            return f"Error with OpenAI API: {str(e)}"
+
+
 class ProofReadAgentMCP:
     def __init__(self, api_key=None, script_path=None, mcp_uri=None):
         api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OpenAI API key not provided or found in environment.")
+
         self.client = OpenAI(api_key=api_key)
         self.model = "gpt-4o-mini_v2024-07-18"
         self.tool_selector = MPCToolSelect(self.client, self.model, script_path, mcp_uri)
         self.use_stdio = self.tool_selector.use_stdio
+        self.proofreader = ProofReadLLM(self.client, self.model)
+
         self.file_read_tool = asyncio.run(
             self.tool_selector.discover_and_select_tool("read file contents")
         )
@@ -173,30 +198,13 @@ class ProofReadAgentMCP:
             print(f"Error inferring intent: {str(e)}")
             return {"intent": "none", "error": f"Error inferring intent: {str(e)}"}
 
-    def _proofread_with_openai(self, text):
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a proofreading assistant. Analyze the given text and provide specific suggestions for spelling, grammar, and clarity improvements. Include the original text and list changes in your response.",
-                    },
-                    {"role": "user", "content": f"Proofread this: {text}"},
-                ],
-                max_tokens=150,
-                temperature=0.7,
-            )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            return f"Error with OpenAI API: {str(e)}"
-
     async def proofread_async(self, user_input):
         intent_data = self._infer_intent_and_file(user_input)
         if intent_data.get("intent") == "proofread" and "file" in intent_data:
             file = intent_data["file"]
             if not self.file_read_tool:
                 return "No tool available to read files."
+
             if self.use_stdio:
                 server_params = StdioServerParameters(
                     command="python", args=[self.tool_selector.script_path], env=None
@@ -211,7 +219,7 @@ class ProofReadAgentMCP:
                         else:
                             logger.info(f"Stdio response: {response}")
                             file_content = response.content[0].text
-                            proofread_result = self._proofread_with_openai(file_content)
+                            proofread_result = self.proofreader.proofread(file_content)
                             return proofread_result
             else:
                 async with sse_client(url=self.tool_selector.mcp_uri) as streams:
@@ -224,17 +232,15 @@ class ProofReadAgentMCP:
                         else:
                             logger.info(f"SSE response: {response}")
                             file_content = response.content[0].text
-                            proofread_result = self._proofread_with_openai(file_content)
+                            proofread_result = self.proofreader.proofread(file_content)
                             return proofread_result
+
         return "Sorry, I couldn't understand your request. Try asking to proofread a file, e.g., 'Check example.txt'."
 
     def proofread(self, user_input):
         return asyncio.run(self.proofread_async(user_input))
 
 
-# test
-# python proofread_mcp.py $(pwd)/example.txt --stdio mcp/filesystem.py
-# python proofread_mcp.py $(pwd)/example.txt $(pwd)/example.txt --sse http://127.0.0.1:8000/sse
 if __name__ == "__main__":
     import sys
 
