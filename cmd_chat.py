@@ -8,8 +8,11 @@ from rich.markdown import Markdown
 
 from chat import ChatOpenAI
 from config import Config
+from hackernews import HackerNews
 from history import ConversationHistory
+from intent import IntentInferrer
 from log import configure_logging
+from proofread_agent import ProofReadAgent
 from rag import KnowledgeBase
 
 # Configure readline
@@ -86,6 +89,8 @@ def run_interactive_chat():
     thread_id = chat.generate_thread_id()
     chat.set_current_thread_id(thread_id)
     mode = "chat"
+
+    inferrer = IntentInferrer(api_key=openai_api_key, model=config.get_chat_model())
 
     while True:
         model_alias = config.get_alias_from_model(
@@ -169,13 +174,23 @@ def run_interactive_chat():
             continue
 
         try:
-            if mode == "rag":
-                response = kb.query(query)
-            elif mode == "chat":
-                response = chat.query(query)
-            print("🤖:\n")
-            markdown_response = Markdown(response)
-            console.print(markdown_response)
-            history.save(query, response)
+            # infer intent first
+            intent_data = inferrer.infer_intent_and_file(query)
+            if intent_data.get("intent") == "proofread" and "file" in intent_data:
+                file_path = intent_data["file"]
+                response = ProofReadAgent().proofread_file(file_path)
+                console.print(Markdown(response))
+            elif intent_data.get("intent") == "fetchnews":
+                print("Fetching news...")
+                HackerNews().do()
+            else:
+                if mode == "rag":
+                    response = kb.query(query)
+                elif mode == "chat":
+                    response = chat.query(query)
+                print("🤖:\n")
+                markdown_response = Markdown(response)
+                console.print(markdown_response)
+                history.save(query, response)
         except Exception as e:
             print(f"Error: {str(e)}")
