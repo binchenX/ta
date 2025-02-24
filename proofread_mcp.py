@@ -5,6 +5,7 @@ from typing import Optional
 
 from openai import OpenAI
 
+from intent import IntentInferrer
 from log import configure_logging
 from mcp import ClientSession, StdioServerParameters, Tool
 from mcp.client.sse import sse_client
@@ -164,6 +165,10 @@ class ProofReadAgentMCP:
         self.tool_selector = MPCToolSelect(self.client, self.model, script_path, mcp_uri)
         self.use_stdio = self.tool_selector.use_stdio
         self.proofreader = ProofReadLLM(self.client, self.model)
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        if not self.api_key:
+            raise ValueError("OpenAI API key not provided or found in environment.")
+        self.inferrer = IntentInferrer(api_key=self.api_key, model=self.model)
 
         self.file_read_tool = asyncio.run(
             self.tool_selector.discover_and_select_tool("read file contents")
@@ -175,31 +180,8 @@ class ProofReadAgentMCP:
                 f"Initialized with file-reading tool: {self.file_read_tool.name} - {self.file_read_tool.description}"
             )
 
-    def _infer_intent_and_file(self, user_input):
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": 'You are an intent detector. Determine if the user wants to proofread a file and extract the file name from the input. Respond with valid JSON using double quotes, e.g., {"intent": "proofread", "file": "filename"} if proofreading is intended, or {"intent": "none"} if not.',
-                    },
-                    {"role": "user", "content": user_input},
-                ],
-                max_tokens=50,
-                temperature=0.5,
-            )
-            raw_content = response.choices[0].message.content.strip()
-            if "'" in raw_content and '"' not in raw_content:
-                raw_content = raw_content.replace("'", '"')
-            intent_data = json.loads(raw_content)
-            return intent_data
-        except Exception as e:
-            print(f"Error inferring intent: {str(e)}")
-            return {"intent": "none", "error": f"Error inferring intent: {str(e)}"}
-
     async def proofread_async(self, user_input):
-        intent_data = self._infer_intent_and_file(user_input)
+        intent_data = self.inferrer.infer_intent_and_file(user_input)
         if intent_data.get("intent") == "proofread" and "file" in intent_data:
             file = intent_data["file"]
             if not self.file_read_tool:
