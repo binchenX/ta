@@ -1,5 +1,6 @@
 import json
 import os
+import unittest
 
 from openai import OpenAI
 
@@ -23,10 +24,10 @@ class IntentInferrer:
                     {
                         "role": "system",
                         "content": (
-                            "You detect user intent. Supported intents: 'proofread' (with file name), "
-                            "'fetchnews', or 'none'. Return JSON, e.g., "
-                            '{"intent": "proofread", "file": "file.txt"} or {"intent": "fetchnews"} '
-                            'or {"intent": "none"}. Extendable for future intents.'
+                            "You detect user intent. Supported intents: 'proofread' (with file name, "
+                            "check for 'detailed' or 'simple', default simple), 'fetchnews', or 'none'. "
+                            "Return JSON, e.g., {'intent': 'proofread', 'file': 'file.txt', 'detailed': true}, "
+                            "{'intent': 'fetchnews'}, or {'intent': 'none'}. Extendable for future intents."
                         ),
                     },
                     {"role": "user", "content": user_input},
@@ -44,3 +45,37 @@ class IntentInferrer:
         except Exception as e:
             logger.error(f"Error inferring intent: {str(e)}")
             return {"intent": "none", "error": str(e)}
+
+
+class TestIntentInferrer(unittest.TestCase):
+    def setUp(self):
+        self.inferrer = IntentInferrer()
+
+    def test_proofread_simple(self):
+        result = self.inferrer.infer_intent_and_file("Proofread file.txt")
+        expected = {"intent": "proofread", "file": "file.txt", "detailed": False}
+        self.assertEqual(result, expected)
+
+    def test_proofread_detailed(self):
+        result = self.inferrer.infer_intent_and_file("Proofread file.txt with detailed review")
+        expected = {"intent": "proofread", "file": "file.txt", "detailed": True}
+        self.assertEqual(result, expected)
+
+    def test_proofread_simple_explicit(self):
+        result = self.inferrer.infer_intent_and_file("Proofread file.txt simply")
+        expected = {"intent": "proofread", "file": "file.txt", "detailed": False}
+        self.assertEqual(result, expected)
+
+    def test_fetchnews(self):
+        result = self.inferrer.infer_intent_and_file("Fetch some news")
+        expected = {"intent": "fetchnews"}
+        self.assertEqual(result, expected)
+
+    def test_none_intent(self):
+        result = self.inferrer.infer_intent_and_file("Hello world")
+        expected = {"intent": "none"}
+        self.assertEqual(result, expected)
+
+
+if __name__ == "__main__":
+    unittest.main()

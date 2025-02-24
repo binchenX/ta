@@ -17,18 +17,23 @@ class ProofReadAgent:
         if not self.client.api_key:
             raise ValueError("No OpenAI API key provided or found in env.")
 
-    def _proofread_with_openai(self, text):
+    def _proofread_with_openai(self, text, detailed=False):
         try:
+            if detailed:
+                system_content = (
+                    "You are a proofreader. Fix spelling, grammar, and clarity. "
+                    "Return in Markdown: '## Original text\n> text\n"
+                    "## Proofreaded text\n> text\n## Changes\n changes'."
+                )
+            else:
+                system_content = (
+                    "You are a proofreader. Fix spelling, grammar, and clarity. "
+                    "Return proofread text in '> text' format."
+                )
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a proofreader. Suggest spelling, grammar, and clarity fixes. "
-                            "Include original text and changes."
-                        ),
-                    },
+                    {"role": "system", "content": system_content},
                     {"role": "user", "content": f"Proofread this: {text}"},
                 ],
                 max_tokens=150,
@@ -47,19 +52,11 @@ class ProofReadAgent:
         except Exception as e:
             return f"Error reading file: {str(e)}"
 
-    def proofread(self, user_input):
-        intent_data = self.inferrer.infer_intent_and_file(user_input)
-        if intent_data.get("intent") == "proofread" and "file" in intent_data:
-            file_path = intent_data["file"]
-            return self.proofread_file(file_path)
-
-        return "Sorry, I couldn’t get your request. Try 'proofread file.txt' or 'fetch news'."
-
-    def proofread_file(self, file_path):
+    def proofread_file(self, file_path, detailed=False):
         file_content = self._read_file(file_path)
         if "Error" in file_content:
             return file_content
-        return self._proofread_with_openai(file_content)
+        return self._proofread_with_openai(file_content, detailed)
 
 
 if __name__ == "__main__":
@@ -68,7 +65,12 @@ if __name__ == "__main__":
         sys.exit(1)
 
     filename = sys.argv[1]
-    user_input = f"Please proofread {filename}"
     agent = ProofReadAgent()
-    response = agent.proofread(user_input)
+    # Simple mode
+    response = agent.proofread_file(filename, detailed=False)
+    print("Simple mode:")
+    print(response)
+    # Detailed mode
+    response = agent.proofread_file(filename, detailed=True)
+    print("\nDetailed mode:")
     print(response)

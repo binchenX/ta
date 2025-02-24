@@ -178,10 +178,12 @@ def run_interactive_chat():
             intent_data = inferrer.infer_intent_and_file(query)
             if intent_data.get("intent") == "proofread" and "file" in intent_data:
                 file_path = intent_data["file"]
-                response = ProofReadAgent().proofread_file(file_path)
+                response = ProofReadAgent().proofread_file(file_path, intent_data["detailed"])
+                print("🤖:\n")
                 console.print(Markdown(response))
             elif intent_data.get("intent") == "fetchnews":
                 print("Fetching news...")
+                print("🤖:\n")
                 HackerNews().do()
             else:
                 if mode == "rag":
