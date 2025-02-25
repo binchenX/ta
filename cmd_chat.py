@@ -48,7 +48,7 @@ def get_input(prompt):
 async def spinner():
     spinner_chars = itertools.cycle(["|", "/", "-", "\\"])
     while True:
-        sys.stdout.write(f"\rLoading {next(spinner_chars)}")
+        sys.stdout.write(f"\r🤖Working... {next(spinner_chars)}")
         sys.stdout.flush()
         await asyncio.sleep(0.1)
 

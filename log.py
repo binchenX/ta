@@ -1,17 +1,11 @@
 import logging
 
 
-def configure_logging():
+def configure_logging(default_level=logging.CRITICAL):
     logging.basicConfig(
-        level=logging.CRITICAL,
+        level=default_level,
         format="%(asctime)s - %(levelname)s - [ %(module)s ] - %(message)s",
     )
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.CRITICAL)
-
-    # turn on when debugging
-    # logging.getLogger("requests").setLevel(logging.DEBUG)
-    # logging.getLogger("urllib3").setLevel(logging.DEBUG)
-    # logging.getLogger("langchain").setLevel(logging.DEBUG)
-
+    logger.setLevel(default_level)
     return logger
