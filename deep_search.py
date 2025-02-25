@@ -1,10 +1,9 @@
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import requests
-from bs4 import BeautifulSoup
 from openai import OpenAI
 
 from log import configure_logging
@@ -19,6 +18,11 @@ if not client.api_key:
 # Model to use
 MODEL = "gpt-4o-mini_v2024-07-18"
 
+# Brave Search API key
+BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
+if not BRAVE_API_KEY:
+    raise ValueError("No Brave Search API key provided or found in env (BRAVE_API_KEY).")
+
 # Concurrency limit
 CONCURRENCY_LIMIT = 2
 
@@ -28,27 +32,24 @@ def trim_prompt(text: str, max_chars: int) -> str:
     return text[:max_chars] + ("..." if len(text) > max_chars else "")
 
 
-# Web search
+# Web search using Brave Search API
 def search_web(query: str, limit: int = 5) -> List[Dict[str, str]]:
-    headers = {"User-Agent": "Mozilla/5.0"}
-    url = f"https://www.google.com/search?q={query}"
-    response = requests.get(url, headers=headers, timeout=15)
-    soup = BeautifulSoup(response.text, "html.parser")
-    results = []
-    for g in soup.select("div.g")[:limit]:
-        link = g.select_one("a")["href"] if g.select_one("a") else None
-        if link and link.startswith("http"):
-            try:
-                page = requests.get(link, headers=headers, timeout=10)
-                page_soup = BeautifulSoup(page.text, "html.parser")
-                content = page_soup.get_text(separator="\n", strip=True)[:25000]
-                results.append({"url": link, "markdown": content})
-            except Exception as e:
-                logger.error(f"Failed to scrape {link}: {e}")
-    return results
+    url = "https://api.search.brave.com/res/v1/web/search"
+    headers = {"Accept": "application/json", "X-Subscription-Token": BRAVE_API_KEY}
+    params = {"q": query, "count": limit}
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        results = data.get("web", {}).get("results", [])
+        logger.info(f"Brave Search for '{query}' returned {len(results)} results")
+        return [{"url": r["url"], "markdown": r.get("description", "")} for r in results[:limit]]
+    except requests.RequestException as e:
+        logger.error(f"Brave Search failed for '{query}': {e}")
+        return []
 
 
-# Generate SERP queries
+# Generate SERP queries (limited to 3)
 def generate_serp_queries(
     query: str, num_queries: int = 3, learnings: List[str] = []
 ) -> List[Dict[str, str]]:
@@ -68,7 +69,7 @@ def generate_serp_queries(
             },
             {"role": "user", "content": prompt},
         ],
-        max_tokens=300,  # Increased to ensure complete JSON
+        max_tokens=300,
     )
     raw_content = response.choices[0].message.content
     logger.info(f"Raw SERP queries response: {raw_content}")
@@ -76,7 +77,7 @@ def generate_serp_queries(
         data = json.loads(raw_content)
         queries = data.get("queries", [])
         logger.info(f"Created {len(queries)} queries: {queries}")
-        return queries[:num_queries]
+        return queries[:num_queries]  # Ensures max 3 queries
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse SERP queries JSON: {e}")
         return []
@@ -105,7 +106,7 @@ def process_serp_result(
             },
             {"role": "user", "content": prompt},
         ],
-        max_tokens=400,  # Increased for more content
+        max_tokens=400,
         timeout=60,
     )
     raw_content = response.choices[0].message.content
@@ -146,7 +147,7 @@ def write_final_report(prompt: str, learnings: List[str], visited_urls: List[str
         """,
             },
         ],
-        max_tokens=1500,  # Increased for longer report
+        max_tokens=1500,
     )
     raw_content = response.choices[0].message.content
     logger.info(f"Raw report response: {raw_content}")
@@ -159,10 +160,10 @@ def write_final_report(prompt: str, learnings: List[str], visited_urls: List[str
         return "# Error\nFailed to generate report due to JSON parsing error."
 
 
-# Deep research function
+# Deep research function (depth and breadth default to 2)
 def deep_research(
     query: str,
-    breadth: int = 4,
+    breadth: int = 2,
     depth: int = 2,
     learnings: List[str] = [],
     visited_urls: List[str] = [],
@@ -237,11 +238,11 @@ def deep_research(
     return {"learnings": all_learnings, "visitedUrls": all_urls}
 
 
-# Main function with hardcoded query and defaults
+# Main function with hardcoded query and reduced defaults
 def main():
     query = "coolest tech in 2025"
-    breadth = 4  # Default
-    depth = 2  # Default
+    breadth = 2  # Reduced from 4
+    depth = 2  # Already 2, kept for clarity
 
     def progress_callback(p):
         logger.info(
