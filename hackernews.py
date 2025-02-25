@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import sys
 from typing import List
@@ -14,7 +15,6 @@ from log import configure_logging
 configure_logging(default_level=logging.INFO)
 logger = logging.getLogger(__name__)  # "hackernews"
 logger.setLevel(logging.CRITICAL)
-
 console = Console()
 
 
@@ -39,16 +39,33 @@ class HackerNews:
         self.model = "gpt-4o-mini_v2024-07-18"
         self.llm = LLM(self.model)
 
+    async def _playwright_get(self, url: str) -> str:
+        """Fetch content using Playwright for JavaScript-rendered pages."""
+        from playwright.async_api import async_playwright
+
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch()
+                page = await browser.new_page()
+                await page.goto(url, wait_until="networkidle")
+                # Wait a bit for dynamic content
+                await page.wait_for_timeout(2000)
+                # Get the text content
+                text = await page.evaluate("() => document.body.innerText")
+                await browser.close()
+                return text
+        except Exception as e:
+            logger.error(f"Playwright error for {url}: {e}")
+            return ""
+
     def get_best_stories(self, limit=20) -> List[dict]:
         """Fetch the best stories by scraping the 'Best' page."""
         try:
             response = requests.get(self.BEST_PAGE_URL)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
-
             story_elements = soup.find_all("tr", class_="athing")[:limit]
             best_story_ids = [elem["id"] for elem in story_elements]
-
             best_stories = []
             for story_id in best_story_ids:
                 story_response = requests.get(self.ITEM_URL.format(story_id))
@@ -56,16 +73,13 @@ class HackerNews:
                 story_details = story_response.json()
                 best_stories.append(story_details)
                 logger.debug(f"Fetched story: {story_details.get('title', 'No title')}")
-
             return best_stories
-
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching best stories: {e}")
             return []
 
     def summarize_text(self, text: str) -> str:
         """Summarize text using the LLM wrapper."""
-        # Truncate to avoid overwhelming the LLM (adjust as needed)
         if len(text) > 10000:
             text = text[:10000]
             logger.debug("Truncated input text to 10,000 chars")
@@ -83,7 +97,7 @@ class HackerNews:
                 summary = "No URL provided to summarize."
             else:
                 try:
-                    # Fetch URL content
+                    # Regular fetch attempt first
                     response = requests.get(url, timeout=10)
                     response.raise_for_status()
                     soup = BeautifulSoup(response.text, "html.parser")
@@ -97,17 +111,19 @@ class HackerNews:
                             p.text.strip() for p in article.find_all("p") if p.text.strip()
                         )
                     else:
-                        # Fallback to all <p> tags, excluding common noise classes
                         paragraphs = [
                             p for p in soup.find_all("p") if "footer" not in p.get("class", [])
                         ]
                         content = " ".join(p.text.strip() for p in paragraphs if p.text.strip())
 
-                    if not content or len(content) < 100:
-                        content = soup.get_text(strip=True)
-                        logger.debug(
-                            "Using full text fallback due to insufficient paragraph content"
-                        )
+                    # If content is too short, try Playwright
+                    if len(content) < 50:
+                        logger.debug(f"Content too short, trying Playwright for {url}")
+                        content = asyncio.run(self._playwright_get(url))
+                        if not content:
+                            summary = "Failed to fetch content with Playwright"
+                            story_objects.append(Story(title, url, summary))
+                            continue
 
                     logger.debug(f"Fetched {len(content)} chars from {url}")
                     if len(content) < 50:
@@ -119,7 +135,6 @@ class HackerNews:
                     summary = f"Failed to fetch content: {str(e)}"
 
             story_objects.append(Story(title, url, summary))
-
         return story_objects
 
     def _display_summaries(self, summaries: List[Story]) -> None:
@@ -143,7 +158,6 @@ def main() -> None:
     if len(sys.argv) != 1:
         print("Usage: python hacker_news.py")
         sys.exit(1)
-
     HackerNews().show(limit=3)
 
 

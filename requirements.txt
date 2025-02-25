@@ -140,6 +140,7 @@ pikepdf==9.5.2
 pillow==11.1.0
 pipdeptree==2.25.0
 platformdirs==4.3.6
+playwright==1.50.0
 posthog==3.13.0
 primp==0.12.1
 propcache==0.2.1
@@ -155,6 +156,7 @@ pydantic==2.10.6
 pydantic-settings==2.7.1
 pydantic_core==2.27.2
 pydeck==0.9.1
+pyee==12.1.1
 Pygments==2.19.1
 pypandoc==1.15
 pyparsing==3.2.1
