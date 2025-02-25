@@ -2,6 +2,8 @@
 
 A command-line AI/LLM tool.
 
+[![asciicast](https://asciinema.org/a/XEQS8Qx3sBH7yDeEEHkADODeO.svg)](https://asciinema.org/a/XEQS8Qx3sBH7yDeEEHkADODeO)
+
 ## Features (so far)
 
 - Command line
@@ -9,24 +11,9 @@ A command-line AI/LLM tool.
 - Choose model
 - Thread Management
 - RAG/Knowledge Base (local markdown files only)
+- Tool Use (local file, mcp, internet, brave search)
+- Agent (kind of) deepsearch using brave search
 
-## Help
-
-```bash
-$ ta
-(4o) ❓>: /help
-Commands:
-/lm: List models
-/lt: List threads
-/st [thread_id]: Set current thread
-/dt [thread_id]: Delete thread
-/nt: New thread
-/chat: Switch to chat mode
-/chat model: Switch chat model to model
-/rag: Switch to RAG mode
-/rag index    : index new directory to knowledge base
-/rag index -f : force index all directories to knowledge base
-```
 
 ## Install
 
