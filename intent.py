@@ -24,10 +24,13 @@ class IntentInferrer:
                     {
                         "role": "system",
                         "content": (
-                            "You detect user intent. Supported intents: 'proofread' (with file name, "
-                            "check for 'detailed' or 'simple', default simple), 'fetchnews', or 'none'. "
+                            "You detect user intent. "
+                            "Supported intents: 'proofread' (with file name, "
+                            "check for 'detailed' or 'simple', default simple), 'fetchnews', 'research' (with topic), or 'none'. "
                             "Return JSON, e.g., {'intent': 'proofread', 'file': 'file.txt', 'detailed': true}, "
+                            "{'intent': 'research', 'topic': 'topic'}."
                             "{'intent': 'fetchnews'}, or {'intent': 'none'}. Extendable for future intents."
+                            "warning: Consider the intent is resarch only if it has 'resarch' or 'deep search' in the user query."
                         ),
                     },
                     {"role": "user", "content": user_input},
@@ -69,6 +72,17 @@ class TestIntentInferrer(unittest.TestCase):
     def test_fetchnews(self):
         result = self.inferrer.infer_intent_and_file("Fetch some news")
         expected = {"intent": "fetchnews"}
+        self.assertEqual(result, expected)
+
+    def test_research(self):
+        result = self.inferrer.infer_intent_and_file("research highest pay in 2025")
+        expected = {"intent": "research", "topic": "highest pay in 2025"}
+        self.assertEqual(result, expected)
+
+    # failed test - that is why all ai has "deepsearch button"
+    def test_none_intent_2(self):
+        result = self.inferrer.infer_intent_and_file("why sky is blue?")
+        expected = {"intent": "none"}
         self.assertEqual(result, expected)
 
     def test_none_intent(self):

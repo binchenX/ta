@@ -7,7 +7,7 @@ def configure_logging():
         format="%(asctime)s - %(levelname)s - [ %(module)s ] - %(message)s",
     )
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.CRITICAL)
 
     # turn on when debugging
     # logging.getLogger("requests").setLevel(logging.DEBUG)

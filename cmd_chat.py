@@ -1,4 +1,6 @@
+import asyncio
 import atexit
+import itertools
 import os
 import readline
 import sys
@@ -8,6 +10,7 @@ from rich.markdown import Markdown
 
 from chat import ChatOpenAI
 from config import Config
+from deep_search import DeepSearch
 from hackernews import HackerNews
 from history import ConversationHistory
 from intent import IntentInferrer
@@ -23,14 +26,10 @@ try:
 except FileNotFoundError:
     pass
 
-# Save history on exit
 atexit.register(readline.write_history_file, HISTFILE)
-
-# Enable tab completion
 readline.parse_and_bind("tab: complete")
 
 logger = configure_logging()
-# Initialize the rich console
 console = Console(width=120)
 
 
@@ -44,6 +43,32 @@ def get_input(prompt):
     except EOFError:
         print("\nEOF detected. Exiting...")
         sys.exit(0)
+
+
+async def spinner():
+    spinner_chars = itertools.cycle(["|", "/", "-", "\\"])
+    while True:
+        sys.stdout.write(f"\rLoading {next(spinner_chars)}")
+        sys.stdout.flush()
+        await asyncio.sleep(0.1)
+
+
+async def long_action_with_spinner(action, *args, is_async=False, **kwargs):
+    """Run a long action (sync or async) with a spinner, returning the result."""
+    spinner_task = asyncio.create_task(spinner())
+    try:
+        if is_async:
+            # If the action is an async coroutine
+            result = await action(*args, **kwargs)
+        else:
+            # If the action is synchronous, run it in an executor
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(None, lambda: action(*args, **kwargs))
+        return result
+    finally:
+        spinner_task.cancel()
+        sys.stdout.write("\r")  # Clear spinner
+        sys.stdout.flush()
 
 
 def run_interactive_chat():
@@ -92,6 +117,7 @@ def run_interactive_chat():
 
     inferrer = IntentInferrer(api_key=openai_api_key, model=config.get_chat_model())
 
+    loop = asyncio.get_event_loop()
     while True:
         model_alias = config.get_alias_from_model(
             config.get_chat_model() if mode == "chat" else config.get_rag_model()
@@ -174,7 +200,7 @@ def run_interactive_chat():
             continue
 
         try:
-            # infer intent first
+            # Infer intent first
             intent_data = inferrer.infer_intent_and_file(query)
             if intent_data.get("intent") == "proofread" and "file" in intent_data:
                 file_path = intent_data["file"]
@@ -185,6 +211,13 @@ def run_interactive_chat():
                 print("Fetching news...")
                 print("🤖:\n")
                 HackerNews().do()
+            elif intent_data.get("intent") == "research" and "topic" in intent_data:
+                print(f"Researching topic: {intent_data['topic']}")
+                print("🤖:\n")
+                response = loop.run_until_complete(
+                    long_action_with_spinner(DeepSearch().research, intent_data["topic"])
+                )
+                console.print(Markdown(response))
             else:
                 if mode == "rag":
                     response = kb.query(query)
@@ -196,3 +229,7 @@ def run_interactive_chat():
                 history.save(query, response)
         except Exception as e:
             print(f"Error: {str(e)}")
+
+
+if __name__ == "__main__":
+    run_interactive_chat()
