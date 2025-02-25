@@ -13,7 +13,7 @@ from log import configure_logging
 # Configure root logger and set hackernews to DEBUG
 configure_logging(default_level=logging.INFO)
 logger = logging.getLogger(__name__)  # "hackernews"
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.CRITICAL)
 
 console = Console()
 
@@ -122,16 +122,21 @@ class HackerNews:
 
         return story_objects
 
-    def display_summaries(self, summaries: List[Story]) -> None:
+    def _display_summaries(self, summaries: List[Story]) -> None:
         """Display summaries as Markdown."""
         for i, story in enumerate(summaries, start=1):
             console.print(Markdown(story.to_markdown()))
 
-    def do(self, limit: int = 3) -> None:
+    def show(self, limit: int = 3) -> None:
+        """Fetch and display the best stories."""
+        best_stories = self.get_best_stories(limit=limit)
+        summarized_stories = self.summarize_stories(best_stories)
+        self._display_summaries(summarized_stories)
+
+    def fetch(self, limit: int = 3) -> List[Story]:
         """Execute the main workflow."""
         best_stories = self.get_best_stories(limit=limit)
-        summaries = self.summarize_stories(best_stories)
-        self.display_summaries(summaries)
+        return self.summarize_stories(best_stories)
 
 
 def main() -> None:
@@ -139,7 +144,7 @@ def main() -> None:
         print("Usage: python hacker_news.py")
         sys.exit(1)
 
-    HackerNews().do(limit=3)
+    HackerNews().show(limit=3)
 
 
 if __name__ == "__main__":

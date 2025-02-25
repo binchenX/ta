@@ -53,17 +53,18 @@ async def spinner():
         await asyncio.sleep(0.1)
 
 
-async def long_action_with_spinner(action, *args, is_async=False, **kwargs):
+async def long_action_with_spinner(action, args=None, is_async=False, **kwargs):
     """Run a long action (sync or async) with a spinner, returning the result."""
     spinner_task = asyncio.create_task(spinner())
     try:
         if is_async:
-            # If the action is an async coroutine
-            result = await action(*args, **kwargs)
+            result = await action(*args, **kwargs) if args else await action()
         else:
-            # If the action is synchronous, run it in an executor
             loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(None, lambda: action(*args, **kwargs))
+            if args or kwargs:
+                result = await loop.run_in_executor(None, lambda: action(*args, **kwargs))
+            else:
+                result = await loop.run_in_executor(None, action)
         return result
     finally:
         spinner_task.cancel()
@@ -208,9 +209,9 @@ def run_interactive_chat():
                 print("🤖:\n")
                 console.print(Markdown(response))
             elif intent_data.get("intent") == "fetchnews":
-                print("Fetching news...")
-                print("🤖:\n")
-                HackerNews().do()
+                stories = loop.run_until_complete(long_action_with_spinner(HackerNews().fetch))
+                markdown_content = "\n\n".join(story.to_markdown() for story in stories)
+                console.print(Markdown(markdown_content))
             elif intent_data.get("intent") == "research" and "topic" in intent_data:
                 print(f"Researching topic: {intent_data['topic']}")
                 print("🤖:\n")
